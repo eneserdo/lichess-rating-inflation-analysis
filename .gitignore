@@ -1,0 +1,7 @@
+lichess_db/
+sample/
+lila/
+stockfish/
+.vscode/
+__pycache__/
+*.py[cod]
