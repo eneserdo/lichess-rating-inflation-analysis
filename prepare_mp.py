@@ -1,5 +1,7 @@
+import argparse
 from collections import Counter
 import copy
+from functools import partial
 from itertools import product
 import os
 from os.path import join as opj
@@ -12,8 +14,12 @@ import zstandard
 import chess
 import chess.pgn
 from rich import print as rprint
-from rich.progress import Progress
 import multiprocessing as mp
+from concurrent.futures import as_completed, ThreadPoolExecutor
+from rich.progress import Progress
+import threading
+
+
 
 # Global variables
 EVERY_N_MONTHS = 6
@@ -23,13 +29,14 @@ RATING_BINS = [(mean - 50, mean + 50) for mean in RATING_BIN_MEANS]
 TIME_CONTROL = {"blitz": (180, 300), "rapid": (600, 900)}
 
 
-def download_db(date: str, output_dir: str = "lichess_db"):
+
+def download_db(date: str, output_dir: str = "lichess_db", progress = None):
     """
     Download the database for a given date and return the path to the file.
     If the file already exists, it will return the path to the file.
     Example date: "2013-01"
     """
-
+    
     os.makedirs(output_dir, exist_ok=True)
     fname = f"lichess_db_standard_rated_{date}.pgn"
     url = f"https://database.lichess.org/standard/{fname}.zst"
@@ -37,17 +44,22 @@ def download_db(date: str, output_dir: str = "lichess_db"):
     if os.path.exists(opj(output_dir, fname)):
         return opj(output_dir, fname)
     
-    wget.download(url, out=output_dir)
-    print(f"Downloaded {fname}.zst")
+    task = progress.add_task(f"Downloading thread: {date}", total=100)
+
+    wget.download(url, out=output_dir, bar=lambda curr, total, width=80: progress.update(task, total=total, completed=curr))
+    # print(f"\nDownloaded {fname}.zst")
 
     with open(opj(output_dir, f"{fname}.zst"), "rb") as compressed:
         dctx = zstandard.ZstdDecompressor()
         with open(opj(output_dir, fname), "wb") as decompressed:
             dctx.copy_stream(compressed, decompressed)
     
-    print(f"Decompressed {fname}.zst -> {fname}")
+    # print(f"Decompressed {fname}.zst -> {fname}")
     os.remove(opj(output_dir, f"{fname}.zst"))
-    print(f"Removed {fname}.zst")
+    # print(f"Removed {fname}.zst")
+    progress.remove_task(task)
+
+    return opj(output_dir, fname)
 
 def get_rating_bin(rating: int) -> str:
     for i, bin in enumerate(RATING_BINS):
@@ -115,9 +127,8 @@ def divide_pgn_file(file_path, num_processes):
 def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
     filtered_game_offsets = []
     counter = {tempo: {mean: 0 for mean in RATING_BIN_MEANS} for tempo in TIME_CONTROL.keys()}
-    print(f"Processing {idx} from {start} to {end}", flush=True)
+    # print(f"Processing {idx} from {start/1024**3:.2f} GB to {end/1024**3:.2f} GB", flush=True)
     
-    i = 0
     with open(pgn_db_path) as pgn_db:
         pgn_db.seek(start)
         
@@ -151,50 +162,79 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
                 game = chess.pgn.read_game(pgn_db)
                 game.accept(exporter)
 
-    print(f"Saved {fname}")
+    # print(f"Saved {fname}")
 
 
 def parallel_filter_games(pgn_db_path: str, num_processes: int):
-    
     boundaries = divide_pgn_file(pgn_db_path, num_processes)
+    # print("Filtering:", pgn_db_path.split("/")[-1])
     with mp.Pool(num_processes) as pool:
         args = [(pgn_db_path, idx, start, end) for idx, (start, end) in enumerate(boundaries)]
-        pool.starmap(filter_games, args)
+        pool.starmap(filter_games, args, chunksize=1)
 
     
     # combine the files, run cat
-    print("Combining the files")
+    # print("Combining the files")
     os.system(f"cat {pgn_db_path[:-4]}_filtered_p*.pgn > {pgn_db_path[:-4]}_filtered.pgn")
     os.system(f"rm {pgn_db_path[:-4]}_filtered_p*.pgn")
     os.system(f"rm {pgn_db_path}")
 
 
-def main():
-    output_dir = "lichess_db"
+def processor_process(download_queue, num_processes):
+    """Process that handles filtering downloaded files"""
+    while True:
+        pgn_path = download_queue.get()
+        if pgn_path is None:  # Signal to stop
+            print("Stopping processor")
+            break
 
-    num_processes = int(sys.argv[1]) if len(sys.argv) > 1 else 8
-
-    # dates = product(range(2015, 2025), range(1, 13, 6))
-    dates = [("2015", 1)]
-
-    for year, month in dates:
-        date = f"{year}-{month:02d}"
-        filtered_pgn_path = opj(output_dir, f"lichess_db_standard_rated_{date}_filtered.pgn")
-        pgn_path = opj(output_dir, f"lichess_db_standard_rated_{date}.pgn")
-        
-        if os.path.exists(filtered_pgn_path):
-            print(f"Skipping {date}")
-            continue
-        
-        print(f"Processing {date}")
-        download_db(date, output_dir)
-        # filter_games(pgn_path, progress)
+        rprint(f"[magenta]Processing[/magenta] {os.path.basename(pgn_path)}", flush=True)
         start = time.perf_counter()
         parallel_filter_games(pgn_path, num_processes)
         end = time.perf_counter()
-        print(f"Time taken: {end - start} seconds")
+        print(f"Time taken: {end - start:.2f} seconds")
+
+
+def main(args):
+
+    dates = []
+    for year, month in product(range(2015, 2025), range(1, 13, EVERY_N_MONTHS)):
+        date = f"{year}-{month:02d}"
+        if os.path.exists(opj(args.output_dir, f"lichess_db_standard_rated_{date}_filtered.pgn")):
+            print(f"Skipping {date} - already processed")
+        else:
+            dates.append(date)
+
+
+    with Progress() as progress:
+        download_queue = mp.Queue()
+        processor = mp.Process(target=processor_process, args=(download_queue, args.num_processes), name="Processor")    
+        processor.start()
+ 
+        
+        with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
+            futures = []
+            for date in dates:
+                futures.append(executor.submit(download_db, date, args.output_dir, progress))
+
+            for future in as_completed(futures):
+                pgn_path = future.result()
+                download_queue.put(pgn_path)
+       
+    
+    # Signal that we're done downloading
+    download_queue.put(None)
+
+    # Wait for both processes to finish
+    processor.join()
 
 
 
 if __name__ == "__main__":
-    main()
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("-o", "--output_dir", type=str, default="lichess_db")
+    arg_parser.add_argument("-p", "--num_processes", type=int, default=8)
+    arg_parser.add_argument("-t", "--num_threads", type=int, default=3)
+    args = arg_parser.parse_args()
+    
+    main(args)
