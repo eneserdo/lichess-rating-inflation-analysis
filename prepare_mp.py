@@ -34,12 +34,12 @@ NUM_THREADS = None
 # Progress bar in multiprocessed and multithreaded environment is a bit tricky
 # This is a simple but kind a hardcoded implementation that works for the current use case
 def progress_bar(progress: int, total: int, task_name: str, line: int):
-    bar_length = 100  # Length of the progress bar
-    filled_length = int(bar_length * progress // total)
+    bar_length = 50  # Length of the progress bar
+    filled_length = round(bar_length * progress / total)
     bar = '█' * filled_length + '-' * (bar_length - filled_length)
     percent = (progress / total) * 100
     sys.stdout.write("\033[{};{}H".format(line, 1)) # should never 0,0
-    sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
+    sys.stdout.write(f'{task_name}|{bar}| {percent:.0f}% Complete')
     sys.stdout.flush()
 
 
@@ -47,6 +47,8 @@ def decompress_db(file_path: str) -> str:
     """
     Decompress the file if it is not already decompressed.
     """
+    sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS, 1))
+    print("Decompressing...", flush=True)
 
     # check if the file is already decompressed
     if os.path.exists(file_path[:-4]):
@@ -75,9 +77,10 @@ def download_db(date: str, output_dir: str, idx: int = None):
     if os.path.exists(opj(output_dir, fname)) or os.path.exists(opj(output_dir, fname[:-4])):
         return opj(output_dir, fname)
 
-    line_row = idx % NUM_THREADS + 2
+    line_row = idx % NUM_THREADS + 3
 
-    wget.download(url, out=output_dir, bar=lambda curr, total, width: progress_bar(curr, total, f"Downloading {fname}", line_row))
+    bar_name = f"Downloading {fname.split('_')[-1].split('.')[0]}"
+    wget.download(url, out=output_dir, bar=lambda curr, total, width: progress_bar(curr, total, bar_name, line_row))
 
     return opj(output_dir, fname)
 
@@ -155,7 +158,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
         
         curr = pgn_db.tell()
         while curr < end:
-            progress_bar(curr, end, f"Filtering pgn_name p{idx}", 2 + NUM_THREADS + idx)
+            progress_bar(curr - start, end - start, f"Filtering pgn_name p{idx}", 3 + NUM_THREADS + idx)
 
             game_headers = chess.pgn.read_headers(pgn_db)
             if game_headers is None:
@@ -209,6 +212,8 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
             args = [(pgn_db_path, idx, start, end, counter, lock) for idx, (start, end) in enumerate(boundaries)]
             results = pool.starmap(filter_games, args, chunksize=1)
 
+    sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS + NUM_PROCESSES, 1))
+    print("Combining filtered files...", flush=True)
 
     os.system(f"cat {pgn_db_path[:-4]}*_filtered_p*.pgn > {pgn_db_path[:-4]}_filtered.pgn")
     os.system(f"rm {pgn_db_path[:-4]}*_filtered_p*.pgn")
@@ -230,7 +235,7 @@ def processor_process(filter_queue, num_processes):
         end = time.perf_counter()
 
         pgn_name = pgn_path[:-8].split("_")[-1]
-        sys.stdout.write("\033[{};{}H".format(2+NUM_THREADS + NUM_PROCESSES, 1))
+        sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS + NUM_PROCESSES, 1))
         print(f"Filtered {pgn_name}", flush=True)
 
 
