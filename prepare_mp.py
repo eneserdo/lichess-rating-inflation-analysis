@@ -1,24 +1,24 @@
 import argparse
-from collections import Counter
 import copy
-from functools import partial
-from itertools import product
+import multiprocessing as mp
 import os
-from os.path import join as opj
-from pprint import pprint
 import sys
 import threading
-from time import perf_counter
 import time
-import wget
-import zstandard
+from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from functools import partial
+from itertools import product
+from os.path import join as opj
+from pprint import pprint
+from time import perf_counter
+
 import chess
 import chess.pgn
+import wget
+import zstandard
 from rich import print as rprint
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
 from rich.progress import Progress
-
 
 # Global variables
 EVERY_N_MONTHS = 6
@@ -38,7 +38,7 @@ def progress_bar(progress: int, total: int, task_name: str, line: int):
     filled_length = int(bar_length * progress // total)
     bar = '█' * filled_length + '-' * (bar_length - filled_length)
     percent = (progress / total) * 100
-    sys.stdout.write("\033[{};{}H".format(line, 0))
+    sys.stdout.write("\033[{};{}H".format(line, 1)) # should never 0,0
     sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
     sys.stdout.flush()
 
@@ -215,11 +215,11 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
     os.system(f"rm {pgn_db_path}")
 
 
-def processor_process(download_queue, num_processes):
+def processor_process(filter_queue, num_processes):
     """Process that handles filtering downloaded files"""
 
     while True:
-        pgn_path = download_queue.get()
+        pgn_path = filter_queue.get()
         if pgn_path is None:  # Signal to stop
             print("Stopping processor")
             break
@@ -230,7 +230,7 @@ def processor_process(download_queue, num_processes):
         end = time.perf_counter()
 
         pgn_name = pgn_path[:-8].split("_")[-1]
-        sys.stdout.write("\033[{};{}H".format(2+NUM_THREADS + NUM_PROCESSES, 0))
+        sys.stdout.write("\033[{};{}H".format(2+NUM_THREADS + NUM_PROCESSES, 1))
         print(f"Filtered {pgn_name}", flush=True)
 
 
@@ -252,23 +252,20 @@ def main(args):
             dates.append(date)
 
     if skip_dates:
-        print(f"Skipping:", ", ".join(skip_dates))
+        print("Skipping:", ", ".join(skip_dates))
 
-
+    filter_queue = mp.Queue()
+    processor = mp.Process(target=processor_process, args=(filter_queue, args.num_processes), name="Processor")    
+    processor.start()
     
-    with Progress() as progress:
-        filter_queue = mp.Queue()
-        processor = mp.Process(target=processor_process, args=(filter_queue, args.num_processes), name="Processor")    
-        processor.start()
-        
-        with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
-            futures = []
-            for idx, date in enumerate(dates):
-                futures.append(executor.submit(download_db, date, args.output_dir, idx))
+    with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
+        futures = []
+        for idx, date in enumerate(dates):
+            futures.append(executor.submit(download_db, date, args.output_dir, idx))
 
-            for future in as_completed(futures):
-                pgn_path = future.result()
-                filter_queue.put(pgn_path)
+        for future in as_completed(futures):
+            pgn_path = future.result()
+            filter_queue.put(pgn_path)
        
     # Signal that we're done downloading
     filter_queue.put(None)
