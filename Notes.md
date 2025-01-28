@@ -2,7 +2,7 @@
 
 1. How ratings of the players and accuracy of moves are correlated in chess?
     - How this correlation evolves over time?
-    - Average move accuracy and rating which is the best estimator for player strength?
+    - Average move accuracy and rating which is the best estimator for player's strength?
 2. Is there an inflation or deflation in ratings?
     - Definition of inflation/deflation
     - show for specific rating categories how their accuracy evolves over time
@@ -11,6 +11,8 @@
 
 3. Choosing a sample of players, how their ratings and accuracy evolve over time?
 
+We are omitting some nuances of the game:
+- In different game phases or when there is not much time, move accuracy might change. We are basically averaging all moves hoping that in average those effects will cancel out.
 
 # Data/Preprocessing
 
@@ -25,4 +27,4 @@ For the analysis, I only considered rated games played by signed users. I filter
 I used Stockfish 17 to evaluate the moves in 20 depth. I used the 
 
 
-
+Website: deployment? extra visualizations 
