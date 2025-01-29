@@ -1,5 +1,6 @@
 import argparse
 import copy
+import glob
 import multiprocessing as mp
 import os
 import sys
@@ -256,15 +257,21 @@ def main(args):
     filter_queue = mp.Queue()
     processor = mp.Process(target=processor_process, args=(filter_queue, args.num_processes), name="Processor")    
     processor.start()
-    
-    with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
-        futures = []
-        for idx, date in enumerate(dates):
-            futures.append(executor.submit(download_db, date, args.output_dir, idx))
 
-        for future in as_completed(futures):
-            pgn_path = future.result()
-            filter_queue.put(pgn_path)
+    if args.num_threads > 0:
+        with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
+            futures = []
+            for idx, date in enumerate(dates):
+                futures.append(executor.submit(download_db, date, args.output_dir, idx))
+
+            for future in as_completed(futures):
+                pgn_path = future.result()
+                filter_queue.put(pgn_path)
+    else:
+        not_yet_filtered = glob.glob(opj(args.output_dir, "lichess_db_standard_rated_*"))
+        for pgn_path in not_yet_filtered:
+            if "filtered" not in pgn_path:
+                filter_queue.put(pgn_path)
        
     # Signal that we're done downloading
     filter_queue.put(None)
