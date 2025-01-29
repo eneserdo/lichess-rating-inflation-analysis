@@ -20,13 +20,7 @@ import zstandard
 from rich import print as rprint
 from rich.progress import Progress
 
-# Global variables
-EVERY_N_MONTHS = 6
-NUM_GAMES_PER_MONTH = 1000
-RATING_BIN_MEANS = [1000, 1200, 1600, 1800, 2000, 2200, 2400, 2600, 2800]
-RATING_BINS = [(mean - 50, mean + 50) for mean in RATING_BIN_MEANS]
-TIME_CONTROL = {"blitz": (180, 300), "rapid": (600, 900)}
-
+import config as cfg
 
 NUM_PROCESSES = None
 NUM_THREADS = None
@@ -85,9 +79,9 @@ def download_db(date: str, output_dir: str, idx: int = None):
     return opj(output_dir, fname)
 
 def get_rating_bin(rating: int) -> str:
-    for i, bin in enumerate(RATING_BINS):
+    for i, bin in enumerate(cfg.RATING_BINS):
         if bin[0] <= rating <= bin[1]:
-            return RATING_BIN_MEANS[i]
+            return cfg.RATING_BIN_MEANS[i]
     return None
 
 def get_time_control(time_control: str) -> str:
@@ -95,7 +89,7 @@ def get_time_control(time_control: str) -> str:
     if time_control == "-":
         return None
     x = int(time_control.split("+")[0])
-    for tempo, (min, max) in TIME_CONTROL.items():
+    for tempo, (min, max) in cfg.TIME_CONTROL.items():
         if min <= x <= max:
             return tempo
     return None
@@ -172,7 +166,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
                 
                 if tempo is not None and bin is not None:
                     with lock:
-                        if counter[tempo][bin] < NUM_GAMES_PER_MONTH:
+                        if counter[tempo][bin] < cfg.NUM_GAMES_PER_MONTH:
                             counter[tempo][bin] += 1
                             filtered_game_offsets.append(pgn_db.tell())
 
@@ -201,7 +195,7 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
     pgn_db_path = pgn_db_path_decompressed
 
     boundaries = divide_pgn_file(pgn_db_path, num_processes)
-    counter = {tempo: {mean: 0 for mean in RATING_BIN_MEANS} for tempo in TIME_CONTROL.keys()}
+    counter = {tempo: {mean: 0 for mean in cfg.RATING_BIN_MEANS} for tempo in cfg.TIME_CONTROL.keys()}
 
         
     with mp.Manager() as manager:
@@ -249,7 +243,7 @@ def main(args):
     dates = []
 
     skip_dates = []
-    for year, month in product(range(2015, 2025), range(1, 13, EVERY_N_MONTHS)):
+    for year, month in product(range(2015, 2025), range(1, 13, cfg.EVERY_N_MONTHS)):
         date = f"{year}-{month:02d}"
         if os.path.exists(opj(args.output_dir, f"lichess_db_standard_rated_{date}_filtered.pgn")):
             skip_dates.append(date)

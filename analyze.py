@@ -15,7 +15,7 @@ import chess
 import chess.pgn
 import numpy as np
 
-
+import config as cfg
 
 def eval_pgn(game: chess.pgn.Game, engine_path, return_extra=False, depth=22, mate_score=10000) -> list[int]:
 
@@ -62,12 +62,6 @@ def get_acpl(evals):
     black_acpl = np.mean(np.maximum(black_diffs, 0))
 
     return white_acpl, black_acpl
-
-
-
-
-
-
 
 
 
@@ -146,7 +140,7 @@ if __name__ == "__main__":
         game = chess.pgn.read_game(pgn)
 
     start=perf_counter()
-    evals, extra = eval_pgn(game, "./stockfish/stockfish-ubuntu-x86-64-avx2")
+    evals, extra = eval_pgn(game, cfg.STOCKFISH_PATH, depth=cfg.STOCKFISH_DEPTH)
     end=perf_counter()
     print(f"Time taken: {end-start} seconds")
     print(evals)
