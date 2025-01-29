@@ -27,4 +27,30 @@ For the analysis, I only considered rated games played by signed users. I filter
 I used Stockfish 17 to evaluate the moves in 20 depth. I used the 
 
 
-Website: deployment? extra visualizations 
+
+## Free form
+
+TL;DR: There is a significant inflation in X ratings in Y tempo. and players average accuracy does not correlate with their rating for some rating ranges.
+
+I have been playing online chess very actively last 5 years on Lichess, and I observed suspicious increase in my ratings throughout the years. Either I was actually improving my game or there is something wrong with the rating system. Due to my strong imposter syndrome, I immediately crossed the former possibility and have decided to analyze the rating system empirically.
+
+<!-- insert a picture of the my rating changes -->
+
+The purpose of a rating system is to estimate the *actual skill* of the players. However, for some reasons, I believe Glicko system in Lichess is not working very well. Another reasonable estimation of skill could be the average *accuracy* of the moves. The definition or formulation of accuracy might differentiate from site to site, but in Lichess, they define it as follows:
+
+"The Accuracy metric indicates how well you play - according to Stockfish, the strongest chess engine"
+
+And to calculate the accuracy, they use the following formula:
+
+First,calculate Win%
+
+Win% = 50 + 50 * (2 / (1 + exp(-0.00368208 * centipawns)) - 1)
+
+Then, calculate Accuracy
+
+Accuracy% = 103.1668 * exp(-0.04354 * (winPercentBefore - winPercentAfter)) - 3.1669
+
+for a move is how your move is close to the best move determined by Stockfish. So, assuming that accuracy is a better estimator than rating to measure the skill of a player, I have decided to analyze the average accuracy of the moves for different rating ranges.
+
+I am aware that in "masa başı" chess, there is a slight deflation in ratings. However, Me and many redditors have felt that in online chess, there is a more significant inflation.
+

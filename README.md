@@ -23,16 +23,28 @@
     - Get their pgns
     - Run the engine on each game in parallel save centipawns and accuracy
 
-## Website
-
-- Create a website to visualize the data
-
 
 # Reproducibility
 
+## Requirements
+
+For python requirements:
 ```bash
-python prepare.py
+pip install -r requirements.txt
+```
+
+You also need to install `stockfish` in your system, and set the `STOCKFISH_PATH` in the `config.py` file.
+
+
+
+```bash
+# Download and filter the database according to the configuration
+python prepare.py -t <num_threads_for_downloading> -p <num_processes_for_filtering>
+
+# Run the engine on each game in parallel, and save centipawns and accuracies
 python analyze.py
+
+# Plot the data
 python plot.py
 ```
 All these scripts takes a very long time to run, but they work in a persistent way, so that if you stop the process, it will resume from where it left off in the next run.
