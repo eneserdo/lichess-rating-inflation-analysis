@@ -1,11 +1,11 @@
 import argparse
-from itertools import product
+import multiprocessing as mp
 import sys
 import time
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
-from rich.progress import Progress
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from itertools import product
 
+from rich.progress import Progress
 
 NUM_PROCESSES = None
 NUM_THREADS = None
@@ -14,41 +14,41 @@ NUM_THREADS = None
 # This is a simple but kind a hardcoded implementation that works for the current use case
 def progress_bar(progress: int, total: int, task_name: str, line: int):
     bar_length = 50  # Length of the progress bar
-    filled_length = int(bar_length * progress // total)
+    filled_length = round(bar_length * progress / total)
     bar = '█' * filled_length + '-' * (bar_length - filled_length)
     percent = (progress / total) * 100
-    sys.stdout.write("\033[{};{}H".format(line, 0))
+    sys.stdout.write("\033[{};{}H".format(line, 1))
     sys.stdout.write("\033[K")
     sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
     sys.stdout.flush()
 
 
 def dummy_download_db(date: str, output_dir: str, idx: int = None):
-    for i in range(100):
-        line_row = idx % NUM_THREADS + 3
+    line_row = idx % NUM_THREADS + 3
+    for i in range(101):
         progress_bar(i, 100, f"Downloading {date}", line_row)
-        time.sleep(0.01)
+        time.sleep(0.05)
 
     return True
 
 
 
-def dummy_filter_games(idx: int):
+def dummy_filter_games(idx: int, asd):
 
-    for i in range(100):
-        progress_bar(i, 100, f"Filtering pgn_name p{idx}", 3 + NUM_THREADS + idx)
-        time.sleep(0.01)
+    for i in range(11):
+        progress_bar(i, 10, f"Filtering pgn_name p{idx}", 3 + NUM_THREADS + idx)
+        time.sleep(0.1)
 
 
     return True
 
 
 
-def parallel_filter_games(pgn_db_path: str, num_processes: int):
+def parallel_filter_games(num_processes: int):
     # pgn_db_path: path to the zst file
         
     with mp.Pool(num_processes) as pool:
-        args = [(idx) for idx in range(num_processes)]
+        args = [(idx, 0) for idx in range(num_processes)]
         results = pool.starmap(dummy_filter_games, args, chunksize=1)
 
 
@@ -64,11 +64,11 @@ def processor_process(download_queue, num_processes):
 
 
         start = time.perf_counter()
-        parallel_filter_games(pgn_path, num_processes)
+        parallel_filter_games(num_processes)
         end = time.perf_counter()
 
-        pgn_name = pgn_path[:-8].split("_")[-1]
-        sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS + NUM_PROCESSES, 0))
+        pgn_name = "dummy"
+        sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS + NUM_PROCESSES, 1))
         sys.stdout.write(f"Filtered {pgn_name}")
         sys.stdout.flush()
 
@@ -80,7 +80,7 @@ def main(args):
 
     sys.stdout.write("\033[2J\033[H") # clear screen, move cursor to top left
 
-    sys.stdout.write("\033[{};{}H".format(1, 0))
+    sys.stdout.write("\033[{};{}H".format(1, 1))
     sys.stdout.write("Concurently downloading and filtering games...")
     sys.stdout.flush()
     dates = []
@@ -97,8 +97,8 @@ def main(args):
     
 
     filter_queue = mp.Queue()
-    # processor = mp.Process(target=processor_process, args=(filter_queue, args.num_processes), name="Processor")    
-    # processor.start()
+    processor = mp.Process(target=processor_process, args=(filter_queue, args.num_processes), name="Processor")    
+    processor.start()
     
     with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
         futures = []
@@ -113,7 +113,7 @@ def main(args):
     filter_queue.put(None)
 
     # Wait for both processes to finish
-    # processor.join()
+    processor.join()
 
 
 

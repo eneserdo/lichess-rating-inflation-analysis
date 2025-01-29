@@ -1,23 +1,25 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import sys
 import multiprocessing as mp
+import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def _print(text, x=0, y=0):
-    sys.stdout.write("\033[{};{}H".format(y, x))
+
+def progress_bar(progress: int, total: int, task_name: str, line: int):
+    bar_length = 50  # Length of the progress bar
+    filled_length = int(bar_length * progress // total)
+    bar = '█' * filled_length + '-' * (bar_length - filled_length)
+    percent = (progress / total) * 100
+    sys.stdout.write("\033[{};{}H".format(line, 1))
     sys.stdout.write("\033[K")
-    sys.stdout.write(text)
+    sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
     sys.stdout.flush()
 
 def worker(idx):
 
     line_row = idx % 3  + 1 
 
-    for i in range(5):
-        sys.stdout.write("\033[{};{}H".format(line_row, i))
-        sys.stdout.write(f"{idx}")
-        sys.stdout.flush()
-        time.sleep(0.1)
+    for i in range(10):
+        progress_bar(i, 10, f"T{idx}", idx)
 
 
 def main():
