@@ -169,7 +169,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
                     with lock:
                         if counter[tempo][bin] < cfg.NUM_GAMES_PER_MONTH:
                             counter[tempo][bin] += 1
-                            filtered_game_offsets.append(pgn_db.tell())
+                            filtered_game_offsets.append(curr)
 
             curr = pgn_db.tell()
 
