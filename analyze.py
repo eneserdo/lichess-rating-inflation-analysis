@@ -74,14 +74,14 @@ def from_centipawns(cp: int) -> float:
     return 2 / (1 + np.exp(-0.00368208 * cp)) - 1
 
 
+# Based on https://github.com/lichess-org/lila/blob/4336bf020e746413e0039f1583a186442084bafa/modules/analyse/src/main/AccuracyPercent.scala#L47-L55
 def from_win_percents(before: float, after: float) -> float:
     if after >= before:
         return 100.0
     win_diff = before - after
-    raw = (
-        103.1668100711649 * np.exp(-0.04354415386753951 * win_diff) - 3.166924740191411
-    )
-    return max(0, min(100, raw + 1))
+    raw = 103.1668100711649 * np.exp(-0.04354415386753951 * win_diff) - 3.166924740191411
+    raw += 1  # uncertainty bonus
+    return max(0, min(100, raw))
 
 
 def weighted_mean(values: List[Tuple[float, float]]) -> Optional[float]:

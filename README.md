@@ -23,10 +23,14 @@
     - Get their pgns
     - Run the engine on each game in parallel save centipawns and accuracy
 
+# Lichess Rating Inflation Analysis
 
-# Reproducibility
+The details are explained in [here](...).
 
-## Requirements
+
+## Reproducibility
+
+### Requirements
 
 For python requirements:
 ```bash
@@ -35,7 +39,7 @@ pip install -r requirements.txt
 
 You also need to install `stockfish` in your system, and set the `STOCKFISH_PATH` in the `config.py` file.
 
-
+### Run
 
 ```bash
 # Download and filter the database according to the configuration
@@ -50,3 +54,7 @@ python plot.py
 All these scripts takes a very long time to run, but they work in a persistent way, so that if you stop the process, it will resume from where it left off in the next run.
 
 All of the process took me 200 hours overall.
+
+## Download
+
+You can download the processed data from [here](...). Please cite this repository properly.
