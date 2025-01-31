@@ -153,7 +153,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
         
         curr = pgn_db.tell()
         while curr < end:
-            progress_bar(curr - start, end - start, f"Filtering pgn_name p{idx}", 3 + NUM_THREADS + idx)
+            progress_bar(curr - start, end - start, f"Filtering {pgn_name} p{idx}", 3 + NUM_THREADS + idx)
 
             game_headers = chess.pgn.read_headers(pgn_db)
             if game_headers is None:
@@ -271,7 +271,10 @@ def main(args):
         not_yet_filtered = glob.glob(opj(args.output_dir, "lichess_db_standard_rated_*"))
         for pgn_path in not_yet_filtered:
             if "filtered" not in pgn_path:
-                filter_queue.put(pgn_path)
+                if "zst" in pgn_path:
+                    filter_queue.put(pgn_path)
+                else:
+                    filter_queue.put(pgn_path+".zst")
        
     # Signal that we're done downloading
     filter_queue.put(None)
