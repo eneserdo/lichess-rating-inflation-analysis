@@ -26,7 +26,7 @@ def progress_bar(progress: int, total: int, task_name: str, line: int):
     bar = '█' * filled_length + '-' * (bar_length - filled_length)
     percent = (progress / total) * 100
     sys.stdout.write("\033[{};{}H".format(line, 1)) # should never 0,0
-    sys.stdout.write(f'{task_name}|{bar}| {percent:.0f}% Complete')
+    sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
     sys.stdout.flush()
 
 
@@ -188,10 +188,11 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
     pgn_db_path = pgn_db_path_decompressed
 
     boundaries = divide_pgn_file(pgn_db_path, num_processes)
-    counter = {tempo: {mean: 0 for mean in cfg.RATING_BIN_MEANS} for tempo in cfg.TIME_CONTROL.keys()}
-
+    
         
     with mp.Manager() as manager:
+        counter = {tempo: manager.dict({mean: 0 for mean in cfg.RATING_BIN_MEANS}) for tempo in cfg.TIME_CONTROL.keys()}
+
         counter = manager.dict(counter)
         lock = manager.Lock()
 
