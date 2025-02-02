@@ -25,6 +25,7 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
     """
 
     root = game
+    start = perf_counter()
     # This cant be parallelized because of the engine
     with chess.engine.SimpleEngine.popen_uci(cfg.STOCKFISH_PATH) as engine:
         while not game.is_end():
@@ -33,6 +34,8 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
                 game.board(), chess.engine.Limit(depth=cfg.STOCKFISH_DEPTH)
             )
             game.set_eval(analyse["score"])
+    end = perf_counter()
+    print(f"Time taken: {end - start} seconds")
     return root
 
 
@@ -173,17 +176,17 @@ def game_accuracy(cps: List[float]) -> Tuple[float, float]:
 def eval_pgn(pgn_file_path: str, idx: int, start: int, end: int):
     # read pgn file, evaluate each game, write to file
 
-    evaluated_pgn_file = pgn_file_path.replace(".pgn", f"_evaluated_{idx}.pgn")
+    evaluated_pgn_file = pgn_file_path.replace(".pgn", f"_evaluated_p{idx}.pgn")
 
-    # with open(evaluated_pgn_file, "w") as f:
-    #     exporter = chess.pgn.FileExporter(f)
-    #     with open(pgn_file) as pgn_file:
-    with open(evaluated_pgn_file, "w") as f, open(pgn_file_path) as pgn_file:
+    with open(evaluated_pgn_file, "w") as f, open(pgn_file_path, "r") as pgn_file:
         exporter = chess.pgn.FileExporter(f)
-
+        i = 0
         pgn_file.seek(start)
         curr = pgn_file.tell()
         while curr < end:
+            i += 1
+            # if i % 10 == 0:
+            print(".", end="", flush=True)
             game = chess.pgn.read_game(pgn_file)
             if game is None:
                 break
@@ -191,30 +194,33 @@ def eval_pgn(pgn_file_path: str, idx: int, start: int, end: int):
             evaluated_game.accept(exporter)
             curr = pgn_file.tell()
 
+        print()
     return True
 
 
-def parallel_eval_pgn(pgn_file: str, num_processes: int):
-    boundaries = divide_pgn_file(pgn_file, num_processes)
+def parallel_eval_pgn(pgn_file_path: str, num_processes: int):
+    boundaries = divide_pgn_file(pgn_file_path, num_processes)
 
     with mp.Pool(num_processes) as pool:
         args = [
-            (pgn_file, idx, start, end) for idx, (start, end) in enumerate(boundaries)
+            (pgn_file_path, idx, start, end) for idx, (start, end) in enumerate(boundaries)
         ]
         results = pool.starmap(eval_pgn, args, chunksize=1)
 
-    os.system(f"cat {pgn_file[:-4]}*_evaluated_*.pgn > {pgn_file[:-4]}_evaluated.pgn")
-    os.system(f"rm {pgn_file[:-4]}*_evaluated_*.pgn")
-    os.system(f"rm {pgn_file}")
+    os.system(f"cat {pgn_file_path[:-4]}*_evaluated_*.pgn > {pgn_file_path[:-4]}_evaluated.pgn")
+    os.system(f"rm {pgn_file_path[:-4]}*_evaluated_*.pgn")
+    os.system(f"rm {pgn_file_path}")
 
 
 def main(args):
     for pgn_file_path in natsorted(glob.glob(os.path.join(args.output_dir, "*.pgn"))):
-        parallel_eval_pgn(pgn_file_path, args.num_processes)
+        # parallel_eval_pgn(pgn_file_path, args.num_processes)
+        print(f"Evaluating {pgn_file_path}...")
+        eval_pgn(pgn_file_path, 0, 0, math.inf)
 
 
 if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser()
+    arg_parser = argparse.ArgumentParser(description="Evaluate pgn files with Stockfish")
     arg_parser.add_argument("-o", "--output_dir", type=str, default="lichess_db", help="Output directory")
     arg_parser.add_argument("-p", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
     args = arg_parser.parse_args()
