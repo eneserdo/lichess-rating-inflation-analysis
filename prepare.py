@@ -1,25 +1,17 @@
 import argparse
-import copy
 import glob
 import multiprocessing as mp
 import os
 import sys
-import threading
 import time
-from collections import Counter
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from functools import partial
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import product
 from os.path import join as opj
-from pprint import pprint
-from time import perf_counter
 
 import chess
 import chess.pgn
 import wget
 import zstandard
-from rich import print as rprint
-from rich.progress import Progress
 
 import config as cfg
 
@@ -285,8 +277,8 @@ def main(args):
 
 
 if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("-o", "--output_dir", type=str, default="lichess_db", help="Output directory")
+    arg_parser = argparse.ArgumentParser(description="Download and filter lichess games")
+    arg_parser.add_argument("-o", "--output_dir", type=str, default="lichess_db", help="Output directory (default: lichess_db)")
     arg_parser.add_argument("-p", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
     arg_parser.add_argument("-t", "--num_threads", type=int, default=3, help="Number of threads to use for downloading (default 3)")
     args = arg_parser.parse_args()
