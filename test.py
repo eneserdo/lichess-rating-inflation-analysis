@@ -1,127 +1,22 @@
-import argparse
-import multiprocessing as mp
-import sys
-import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from itertools import product
+import chess
+import chess.pgn
 
-from rich.progress import Progress
+fname = "./sample/lichess_pgn_2025.02.01_enerd_vs_Ivan_Umpelev.1dE5J3x7.pgn"
 
-NUM_PROCESSES = None
-NUM_THREADS = None
+with open(fname, "r") as f:
+    game = chess.pgn.read_game(f)
 
-# Progress bar in multiprocessed and multithreaded environment is a bit tricky
-# This is a simple but kind a hardcoded implementation that works for the current use case
-def progress_bar(progress: int, total: int, task_name: str, line: int):
-    bar_length = 50  # Length of the progress bar
-    filled_length = round(bar_length * progress / total)
-    bar = '█' * filled_length + '-' * (bar_length - filled_length)
-    percent = (progress / total) * 100
-    sys.stdout.write("\033[{};{}H".format(line, 1))
-    sys.stdout.write("\033[K")
-    sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
-    sys.stdout.flush()
+evals = []
+while not game.is_end():
+    game = game.next()
+    evals.append(game.eval().white().score(mate_score=1000))
 
 
-def dummy_download_db(date: str, output_dir: str, idx: int = None):
-    line_row = idx % NUM_THREADS + 3
-    for i in range(101):
-        progress_bar(i, 100, f"Downloading {date}", line_row)
-        time.sleep(0.05)
+from test import game_accuracy
 
-    return True
+with open(fname, "r") as f:
+    game = chess.pgn.read_game(f)
 
-
-
-def dummy_filter_games(idx: int, asd):
-
-    for i in range(11):
-        progress_bar(i, 10, f"Filtering pgn_name p{idx}", 3 + NUM_THREADS + idx)
-        time.sleep(0.1)
-
-
-    return True
-
-
-
-def parallel_filter_games(num_processes: int):
-    # pgn_db_path: path to the zst file
-        
-    with mp.Pool(num_processes) as pool:
-        args = [(idx, 0) for idx in range(num_processes)]
-        results = pool.starmap(dummy_filter_games, args, chunksize=1)
-
-
-
-def processor_process(download_queue, num_processes):
-    """Process that handles filtering downloaded files"""
-
-    while True:
-        pgn_path = download_queue.get()
-        if pgn_path is None:  # Signal to stop
-            print("Stopping processor")
-            break
-
-
-        start = time.perf_counter()
-        parallel_filter_games(num_processes)
-        end = time.perf_counter()
-
-        pgn_name = "dummy"
-        sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS + NUM_PROCESSES, 1))
-        sys.stdout.write(f"Filtered {pgn_name}")
-        sys.stdout.flush()
-
-
-def main(args):
-    global NUM_PROCESSES, NUM_THREADS
-    NUM_PROCESSES = args.num_processes
-    NUM_THREADS = args.num_threads
-
-    sys.stdout.write("\033[2J\033[H") # clear screen, move cursor to top left
-
-    sys.stdout.write("\033[{};{}H".format(1, 1))
-    sys.stdout.write("Concurently downloading and filtering games...")
-    sys.stdout.flush()
-    dates = []
-
-    skip_dates = []
-    for year, month in product(range(2015, 2025), range(1, 13, 6)):
-        date = f"{year}-{month:02d}"
-        dates.append(date)
-
-    # if skip_dates:
-    #     print(f"Skipping:", ", ".join(skip_dates))
-
-
-    
-
-    filter_queue = mp.Queue()
-    processor = mp.Process(target=processor_process, args=(filter_queue, args.num_processes), name="Processor")    
-    processor.start()
-    
-    with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
-        futures = []
-        for idx, date in enumerate(dates):
-            futures.append(executor.submit(dummy_download_db, date, args.output_dir, idx))
-
-        for future in as_completed(futures):
-            pgn_path = future.result()
-            filter_queue.put(pgn_path)
-       
-    # Signal that we're done downloading
-    filter_queue.put(None)
-
-    # Wait for both processes to finish
-    processor.join()
-
-
-
-if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("-o", "--output_dir", type=str, default="lichess_db", help="Output directory")
-    arg_parser.add_argument("-p", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
-    arg_parser.add_argument("-t", "--num_threads", type=int, default=3, help="Number of threads to use for downloading (default 3)")
-    args = arg_parser.parse_args()
-    
-    main(args)
+wa, ba = game_accuracy(evals)
+print(f"{wa=}, {ba=}")
+print("ok")

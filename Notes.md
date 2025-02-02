@@ -46,6 +46,8 @@ First,calculate Win%
 
 Win% = 50 + 50 * (2 / (1 + exp(-0.00368208 * centipawns)) - 1)
 
+This function is an estimation based on real data, but it has been claimed that it may not be a good estimator for high-level players: https://chessenginelab.substack.com/p/expected-score-of-grandmasters
+
 Then, calculate Accuracy
 
 Accuracy% = 103.1668 * exp(-0.04354 * (winPercentBefore - winPercentAfter)) - 3.1669
@@ -54,3 +56,4 @@ for a move is how your move is close to the best move determined by Stockfish. S
 
 I am aware that in "masa başı" chess, there is a slight deflation in ratings. However, Me and many redditors have felt that in online chess, there is a more significant inflation.
 
+https://zwischenzug.substack.com/p/centipawns-suck
