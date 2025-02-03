@@ -237,7 +237,7 @@ def main(args):
     dates = []
 
     skip_dates = []
-    for year, month in product(range(2015, 2025), range(1, 13, cfg.EVERY_N_MONTHS)):
+    for year, month in product(range(2018, 2025), range(1, 13, cfg.EVERY_N_MONTHS)):
         date = f"{year}-{month:02d}"
         if os.path.exists(opj(args.output_dir, f"lichess_db_standard_rated_{date}_filtered.pgn")):
             skip_dates.append(date)
