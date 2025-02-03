@@ -1,9 +1,64 @@
+import os
+import sys
 from pprint import pprint
+
 import chess
 import chess.pgn
 
 import config as cfg
-from prepare import get_rating_bin, get_time_control
+
+
+def get_rating_bin(rating: int) -> str:
+    for i, bin in enumerate(cfg.RATING_BINS):
+        if bin[0] <= rating <= bin[1]:
+            return cfg.RATING_BIN_MEANS[i]
+    return None
+
+def get_time_control(time_control: str) -> str:
+    # time_control: "X+Y"
+    if time_control == "-":
+        return None
+    x = int(time_control.split("+")[0])
+    for tempo, (min, max) in cfg.TIME_CONTROL.items():
+        if min <= x <= max:
+            return tempo
+    return None
+
+# Progress bar in multiprocessed and multithreaded environment is a bit tricky
+# This is a simple but kind a hardcoded implementation that works for the current use case
+def progress_bar(progress: int, total: int, task_name: str, line: int):
+    bar_length = 50  # Length of the progress bar
+    filled_length = round(bar_length * progress / total)
+    bar = '█' * filled_length + '-' * (bar_length - filled_length)
+    percent = (progress / total) * 100
+    sys.stdout.write("\033[{};{}H".format(line, 1)) # should never 0,0
+    sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
+    sys.stdout.flush()
+
+def divide_pgn_file(file_path, num_processes):
+    """
+    Divide the file into approximately equal parts for each process. It respects the game boundaries.
+    """
+    file_size = os.path.getsize(file_path)
+    chunk_size = file_size // num_processes
+    boundaries = [i * chunk_size for i in range(num_processes)]
+    boundaries.append(file_size)  # Ensure the last chunk covers the end
+
+    # get the actual boundaries
+    with open(file_path) as pgn_db:
+        for idx, start in enumerate(boundaries[:-1]):
+            pgn_db.seek(start)
+            
+            # skip until the next game
+            line = pgn_db.readline()
+            while "[Event" not in line:
+                line = pgn_db.readline()
+
+            boundaries[idx] = pgn_db.tell() - len(line)
+
+    boundaries = [[boundaries[i-1], boundaries[i]] for i in range(1, len(boundaries))]
+
+    return boundaries
 
 def count_games(pgn_file_path: str):
     counter = {tempo: {mean: 0 for mean in cfg.RATING_BIN_MEANS} for tempo in cfg.TIME_CONTROL.keys()}
