@@ -1,32 +1,10 @@
-# My Great Plan
+# Lichess Rating Inflation Analysis Guided by Accuracy
 
-## Analysis 
+There is a lot of talk about rating inflation in chess. I wanted to see if this is true by analysing the data from Lichess. Although I am aware that rating has different dynamics in online and offline chess, I want to show the Lichess case. 
 
-### For general trend
+I will analyze the data in two ways: general trend in rating changes and rating changes of famous players.
 
-- For every 6 months from 2015-01 to 2025-01:
-    - Download the database (`download_db`)
-    - Remove uninteresting games
-    - Delete the database
-
-- For each database:
-    - Run the engine on each game in parallel save centipawns and accuracy
-
-- Create nested dict for accuracy:
-    - Time (6 months)
-    - Time control (blitz, rapid)
-    - Rating (1000±50, 1200±50, ..., 2800±50)
-
-### For famous players
-
-- For each player:
-    - Get their pgns
-    - Run the engine on each game in parallel save centipawns and accuracy
-
-# Lichess Rating Inflation Analysis
-
-The details are explained in [here](...).
-
+I downloaded the Lichess PGN database from 2018 to 2024 twice a year, and filtered it according to the time period and time control. Then, I run the engine on each game and save the centipawns and finally calculated the game accuracies that is specified by Lichess.
 
 ## Reproducibility
 
@@ -37,24 +15,29 @@ For python requirements:
 pip install -r requirements.txt
 ```
 
-You also need to install `stockfish` in your system, and set the `STOCKFISH_PATH` in the `config.py` file.
+You also need to install [stockfish](https://stockfishchess.org/) in your system, and set the `STOCKFISH_PATH` in the `config.py` file. I used the version 17.
 
 ### Run
 
 ```bash
-# Download and filter the database according to the configuration
+# Download and filter the database according to the config.py file.
 python prepare.py -t <num_threads_for_downloading> -p <num_processes_for_filtering>
 
-# Run the engine on each game in parallel, and save centipawns and accuracies
-python analyze.py
+# Run the engine on each pgn file in parallel and save as evaluated pgn files
+python evaluate.py -p <num_processes>
+
+# Calculate the game accuracy and some other metrics, and save as json files per pgn file
+python analyse.py 
 
 # Plot the data
 python plot.py
 ```
+
+
 All these scripts takes a very long time to run, but they work in a persistent way, so that if you stop the process, it will resume from where it left off in the next run.
 
-All of the process took me 200 hours overall.
+All of these scripts took me 200 hours to run.
 
 ## Download
 
-You can download the processed data from [here](...). Please cite this repository properly.
+You can download the evaluated pgn files from [here](...). If you want to use the data for your research, please cite this repository properly.
