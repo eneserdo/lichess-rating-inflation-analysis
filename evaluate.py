@@ -4,6 +4,7 @@ import math
 import multiprocessing as mp
 import os
 import statistics
+import sys
 from time import perf_counter
 from typing import List, Optional, Tuple
 
@@ -13,7 +14,7 @@ import numpy as np
 from natsort import natsorted
 
 import config as cfg
-from prepare import divide_pgn_file
+from prepare import divide_pgn_file, progress_bar
 
 CEILING = 1000
 INITIAL_CP = 15
@@ -35,7 +36,6 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
             )
             game.set_eval(analyse["score"])
     end = perf_counter()
-    print(f"Time taken: {end - start} seconds")
     return root
 
 
@@ -180,13 +180,11 @@ def eval_pgn(pgn_file_path: str, idx: int, start: int, end: int):
 
     with open(evaluated_pgn_file, "w") as f, open(pgn_file_path, "r") as pgn_file:
         exporter = chess.pgn.FileExporter(f)
-        i = 0
+
         pgn_file.seek(start)
         curr = pgn_file.tell()
         while curr < end:
-            i += 1
-            # if i % 10 == 0:
-            print(".", end="", flush=True)
+            progress_bar(curr - start, end - start, f"Evaluating {idx:02d}", 3+idx)
             game = chess.pgn.read_game(pgn_file)
             if game is None:
                 break
@@ -194,7 +192,6 @@ def eval_pgn(pgn_file_path: str, idx: int, start: int, end: int):
             evaluated_game.accept(exporter)
             curr = pgn_file.tell()
 
-        print()
     return True
 
 
@@ -213,19 +210,20 @@ def parallel_eval_pgn(pgn_file_path: str, num_processes: int):
 
 
 def main(args):
-    for pgn_file_path in natsorted(glob.glob(os.path.join(args.output_dir, "*.pgn"))):
+    # for pgn_file_path in natsorted(glob.glob(os.path.join(args.output_dir, "*.pgn"))):
         # parallel_eval_pgn(pgn_file_path, args.num_processes)
-        print(f"Evaluating {pgn_file_path}...")
-        eval_pgn(pgn_file_path, 0, 0, math.inf)
 
+    # eval_pgn("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn", 0, 0, math.inf)
+    sys.stdout.write("\033[2J\033[H") # clear screen, move cursor to top left
+    print("Concurently evaluating games...", flush=True)
+    parallel_eval_pgn("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn", args.num_processes)
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Evaluate pgn files with Stockfish")
     arg_parser.add_argument("-o", "--output_dir", type=str, default="lichess_db", help="Output directory")
-    arg_parser.add_argument("-p", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
+    arg_parser.add_argument("-p", "--num_processes", type=int, default=12, help="Number of processes to use for filtering (default 8)")
     args = arg_parser.parse_args()
 
     start = perf_counter()
     main(args)
     end = perf_counter()
-    print(f"Time taken: {end - start} seconds")
