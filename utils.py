@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pprint import pprint
 
 import chess
@@ -24,16 +25,33 @@ def get_time_control(time_control: str) -> str:
             return tempo
     return None
 
-# Progress bar in multiprocessed and multithreaded environment is a bit tricky
-# This is a simple but kind a hardcoded implementation that works for the current use case
-def progress_bar(progress: int, total: int, task_name: str, line: int):
-    bar_length = 50  # Length of the progress bar
-    filled_length = round(bar_length * progress / total)
-    bar = '█' * filled_length + '-' * (bar_length - filled_length)
-    percent = (progress / total) * 100
-    sys.stdout.write("\033[{};{}H".format(line, 1)) # should never 0,0
-    sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
-    sys.stdout.flush()
+class PrintInLine:
+    def __new__(cls):
+        raise Exception("This class is a singleton!")
+
+    @staticmethod
+    def print(line: int, text: str):
+        sys.stdout.write(f"\033[{line};1H") # should never 0,0
+        sys.stdout.write("\033[K")
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    @staticmethod
+    def reset():
+        sys.stdout.write("\033c")
+        sys.stdout.flush()
+
+    # Progress bar in multiprocessed and multithreaded environment is a bit tricky
+    # This is a simple but kind a hardcoded implementation that works for the current use case
+    @staticmethod
+    def progress_bar(progress: int, total: int, task_name: str, line: int):
+        bar_length = 50  # Length of the progress bar
+        filled_length = round(bar_length * progress / total)
+        bar = '█' * filled_length + '-' * (bar_length - filled_length)
+        percent = (progress / total) * 100
+        sys.stdout.write(f"\033[{line};1H") # should never 0,0
+        sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
+        sys.stdout.flush()
 
 def divide_pgn_file(file_path, num_processes):
     """
@@ -80,4 +98,10 @@ def count_games(pgn_file_path: str):
 
 
 if __name__ == "__main__":
-    count_games("lichess_db/lichess_db_standard_rated_2020-01_filtered.pgn")
+    count_games("lichess_db/lichess_db_standard_rated_2018-01_filtered.pgn")
+    # PrintInLine.print(1, "Hello")
+    # PrintInLine.print(2, "World")
+    # PrintInLine.print(3, "Helloasdfasdf")
+    # time.sleep(1)
+    # PrintInLine.print(3, "Hello")
+    # PrintInLine.print(4, "World")

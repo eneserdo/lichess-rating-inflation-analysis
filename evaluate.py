@@ -1,14 +1,13 @@
 import argparse
 import multiprocessing as mp
 import os
-import sys
 from time import perf_counter
 
 import chess
 import chess.pgn
 
 import config as cfg
-from utils import divide_pgn_file, progress_bar
+from utils import PrintInLine, divide_pgn_file
 
 
 def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
@@ -41,7 +40,7 @@ def eval_pgn(pgn_file_path: str, idx: int, start: int, end: int):
         pgn_file.seek(start)
         curr = pgn_file.tell()
         while curr < end:
-            progress_bar(curr - start, end - start, f"Evaluating {idx:02d}", 3+idx)
+            PrintInLine.progress_bar(curr - start, end - start, f"Evaluating {idx:02d}", 3+idx)
             game = chess.pgn.read_game(pgn_file)
             if game is None:
                 break
@@ -71,8 +70,8 @@ def main(args):
         # parallel_eval_pgn(pgn_file_path, args.num_processes)
 
     # eval_pgn("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn", 0, 0, math.inf)
-    sys.stdout.write("\033[2J\033[H") # clear screen, move cursor to top left
-    print("Concurently evaluating games...", flush=True)
+    PrintInLine.reset()
+    PrintInLine.print(1, "Concurently evaluating games...")
     parallel_eval_pgn("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn", args.num_processes)
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@ import argparse
 import glob
 import multiprocessing as mp
 import os
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import product
@@ -14,7 +13,8 @@ import wget
 import zstandard
 
 import config as cfg
-from utils import get_rating_bin, get_time_control, progress_bar
+from utils import (PrintInLine, divide_pgn_file, get_rating_bin,
+                   get_time_control)
 
 NUM_PROCESSES = None
 NUM_THREADS = None
@@ -24,8 +24,7 @@ def decompress_db(file_path: str) -> str:
     """
     Decompress the file if it is not already decompressed.
     """
-    sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS, 1))
-    print("Decompressing...", flush=True)
+    PrintInLine.print(3+NUM_THREADS, "Decompressing...")
 
     # check if the file is already decompressed
     if os.path.exists(file_path[:-4]):
@@ -57,7 +56,8 @@ def download_db(date: str, output_dir: str, idx: int = None):
     line_row = idx % NUM_THREADS + 3
 
     bar_name = f"Downloading {fname.split('_')[-1].split('.')[0]}"
-    wget.download(url, out=output_dir, bar=lambda curr, total, width: progress_bar(curr, total, bar_name, line_row))
+    # wget.download(url, out=output_dir, bar=lambda curr, total, width: progress_bar(curr, total, bar_name, line_row))
+    wget.download(url, out=output_dir, bar=lambda curr, total, width: PrintInLine.progress_bar(curr, total, bar_name, line_row))
 
     return opj(output_dir, fname)
 
@@ -94,7 +94,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
         
         curr = pgn_db.tell()
         while curr < end:
-            progress_bar(curr - start, end - start, f"Filtering {pgn_name} p{idx}", 3 + NUM_THREADS + idx)
+            PrintInLine.progress_bar(curr - start, end - start, f"Filtering {pgn_name} p{idx:02d}", 3 + NUM_THREADS + idx)
 
             game_headers = chess.pgn.read_headers(pgn_db)
             if game_headers is None:
@@ -149,8 +149,7 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
             args = [(pgn_db_path, idx, start, end, counter, lock) for idx, (start, end) in enumerate(boundaries)]
             results = pool.starmap(filter_games, args, chunksize=1)
 
-    sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS + NUM_PROCESSES, 1))
-    print("Combining filtered files...", flush=True)
+    PrintInLine.print(3+NUM_THREADS + NUM_PROCESSES, "Combining filtered files...")
 
     os.system(f"cat {pgn_db_path[:-4]}*_filtered_p*.pgn > {pgn_db_path[:-4]}_filtered.pgn")
     os.system(f"rm {pgn_db_path[:-4]}*_filtered_p*.pgn")
@@ -172,8 +171,7 @@ def processor_process(filter_queue, num_processes):
         end = time.perf_counter()
 
         pgn_name = pgn_path[:-8].split("_")[-1]
-        sys.stdout.write("\033[{};{}H".format(3+NUM_THREADS + NUM_PROCESSES, 1))
-        print(f"Filtered {pgn_name}", flush=True)
+        PrintInLine.print(3+NUM_THREADS + NUM_PROCESSES, f"Filtered {pgn_name} in {end-start:.2f}s")
 
 
 def main(args):
@@ -181,8 +179,8 @@ def main(args):
     NUM_PROCESSES = args.num_processes
     NUM_THREADS = args.num_threads
 
-    sys.stdout.write("\033[2J\033[H") # clear screen, move cursor to top left
-    print("Concurently downloading and filtering games...", flush=True)
+    PrintInLine.reset()
+    PrintInLine.print(1, "Concurently downloading and filtering games...")
     dates = []
 
     skip_dates = []
