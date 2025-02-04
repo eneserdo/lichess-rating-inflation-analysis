@@ -6,3 +6,4 @@ stockfish/
 __pycache__/
 *.py[cod]
 *.png
+*.tmp
