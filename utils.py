@@ -1,3 +1,4 @@
+import datetime
 import os
 import sys
 import time
@@ -44,13 +45,26 @@ class PrintInLine:
     # Progress bar in multiprocessed and multithreaded environment is a bit tricky
     # This is a simple but kind a hardcoded implementation that works for the current use case
     @staticmethod
-    def progress_bar(progress: int, total: int, task_name: str, line: int):
+    def progress_bar(progress: int, total: int, task_name: str, line: int, stime=[0], update_interval=[0]):
+        if stime[0] == 0:
+            stime[0] = time.time()
+        
+        # In order to avoid spamming the console, we only update the progress bar every 100 updates
+        if update_interval[0] != 100:
+            update_interval[0] += 1
+            return
+        update_interval[0] = 0
+
         bar_length = 50  # Length of the progress bar
         filled_length = round(bar_length * progress / total)
         bar = '█' * filled_length + '-' * (bar_length - filled_length)
         percent = (progress / total) * 100
+        expected_time = (time.time() - stime[0]) * (total - progress) / (progress+1e-6)
+        # expected_time = round(expected_time, -2)
+        expected_time = datetime.timedelta(seconds=expected_time)
         sys.stdout.write(f"\033[{line};1H") # should never 0,0
-        sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete')
+        sys.stdout.write("\033[K")
+        sys.stdout.write(f'{task_name}|{bar}| {percent:.2f}% Complete (remaining: {expected_time})')
         sys.stdout.flush()
 
 def divide_pgn_file(file_path, num_processes):
