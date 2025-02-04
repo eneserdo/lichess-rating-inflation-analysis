@@ -1,0 +1,100 @@
+import math
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+
+sns.set_theme()
+
+from utils import centipawn_to_winpercent, winpercents_to_accuracy
+
+
+def plot_winpercent_formula():
+    # Create figure with seaborn styling
+    plt.figure(figsize=(10, 6), dpi=100)  # Larger, higher resolution figure
+    
+    # Create the plot
+    x = np.linspace(-1500, 1500, 1000)
+    sns.lineplot(x=x, 
+                y=[centipawn_to_winpercent(cp) for cp in x],
+                linewidth=2,
+                color='#2166ac')  # Professional blue color
+    
+    # Customize the plot
+    plt.title('Centipawns to Win Percentage', 
+             fontsize=14, 
+             pad=15)
+    plt.xlabel('Centipawns', fontsize=12)
+    plt.ylabel('Win Percent (%)', fontsize=12)
+
+    # add formula, right bottom corner
+    plt.text(1400, 10, r'$Win\% = 50 + 50 \cdot \left( \frac{2}{1 + e^{k \cdot cp}} - 1 \right)$', 
+             fontsize=12, 
+             ha='right', 
+             va='bottom')
+    plt.text(1400, 4, r'$k = -0.00368208$', 
+             fontsize=9, 
+             ha='right', 
+             va='bottom')
+    
+    # Add grid (though seaborn includes this by default)
+    plt.grid(True, linestyle='-', alpha=0.7)
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save with white background and higher quality
+    plt.savefig("winpercent.png", 
+                bbox_inches='tight', 
+                facecolor='white', 
+                edgecolor='none')
+
+def plot_accuracy_formula():
+    # Create figure with seaborn styling
+    plt.figure(figsize=(10, 6), dpi=100)  # Larger, higher resolution figure
+    
+    # Create the plot
+    x = np.linspace(-100, 100, 1000)
+    sns.lineplot(x=x, 
+                y=[winpercents_to_accuracy(0, cp) for cp in x],
+                linewidth=2,
+                color='#2166ac')  # Professional blue color
+
+    # Customize the plot
+    plt.title('Accuracy Percentage', 
+             fontsize=14, 
+             pad=15)
+    plt.xlabel('Centipawns', fontsize=12)
+    plt.ylabel('Accuracy (%)', fontsize=12)
+
+    # add formula, right bottom corner  
+    plt.text(1400, 10, r'$A(\Delta cp) = 100 - 103.1668100711649 \cdot e^{0.04354415386753951 \cdot \Delta cp} + 3.166924740191411$', 
+             fontsize=12, 
+             ha='right', 
+             va='bottom')
+    
+    # Add grid (though seaborn includes this by default)
+    plt.grid(True, linestyle='-', alpha=0.7)
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save with white background and higher quality
+    plt.savefig("accuracy.png", 
+                bbox_inches='tight', 
+                facecolor='white', 
+                edgecolor='none')
+
+
+if __name__ == '__main__':
+    plot_winpercent_formula()
+    plot_accuracy_formula()
+
+    # read json file and load: game accuracy, error counts, acpl
+    # json[tempo][rating][game_identifier] = {
+    #     "accuracy": (float, float),
+    #     "error_counts": ((int,int,int), (int,int,int)),
+    #     "acpl": (float, float)
+    # }
+        
+    
