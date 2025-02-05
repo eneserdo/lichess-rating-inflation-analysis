@@ -55,9 +55,9 @@ def download_db(date: str, output_dir: str, idx: int = None):
 
     line_row = idx % NUM_THREADS + 3
 
+    pbar = PrintInLine.get_pbar_function()
     bar_name = f"Downloading {fname.split('_')[-1].split('.')[0]}"
-    # wget.download(url, out=output_dir, bar=lambda curr, total, width: progress_bar(curr, total, bar_name, line_row))
-    wget.download(url, out=output_dir, bar=lambda curr, total, width: PrintInLine.progress_bar(curr, total, bar_name, line_row))
+    wget.download(url, out=output_dir, bar=lambda curr, total, width: pbar(curr, total, bar_name, line_row))
 
     return opj(output_dir, fname)
 
@@ -92,9 +92,11 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
     with open(pgn_db_path) as pgn_db:
         pgn_db.seek(start)
         
+        pbar = PrintInLine.get_pbar_function()
+
         curr = pgn_db.tell()
         while curr < end:
-            PrintInLine.progress_bar(curr - start, end - start, f"Filtering {pgn_name} p{idx:02d}", 3 + NUM_THREADS + idx)
+            pbar(curr - start, end - start, f"Filtering {pgn_name} p{idx:02d}", 3 + NUM_THREADS + idx)
 
             game_headers = chess.pgn.read_headers(pgn_db)
             if game_headers is None:

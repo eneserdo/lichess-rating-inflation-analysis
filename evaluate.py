@@ -1,10 +1,12 @@
 import argparse
+import glob
 import multiprocessing as mp
 import os
 from time import perf_counter
 
 import chess
 import chess.pgn
+from natsort import natsorted
 
 import config as cfg
 from utils import PrintInLine, divide_pgn_file
@@ -16,7 +18,6 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
     """
 
     root = game
-    start = perf_counter()
     # This cant be parallelized because of the engine
     with chess.engine.SimpleEngine.popen_uci(cfg.STOCKFISH_PATH) as engine:
         while not game.is_end():
@@ -25,7 +26,6 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
                 game.board(), chess.engine.Limit(depth=cfg.STOCKFISH_DEPTH)
             )
             game.set_eval(analyse["score"])
-    end = perf_counter()
     return root
 
 
@@ -39,8 +39,9 @@ def eval_pgn(pgn_file_path: str, idx: int, start: int, end: int):
 
         pgn_file.seek(start)
         curr = pgn_file.tell()
+        pbar = PrintInLine.get_pbar_function(0)
         while curr < end:
-            PrintInLine.progress_bar(curr - start, end - start, f"Evaluating {idx:02d}", 3+idx)
+            pbar(curr - start, end - start, f"Evaluating {idx:02d}", 3+idx)
             game = chess.pgn.read_game(pgn_file)
             if game is None:
                 break
@@ -66,12 +67,17 @@ def parallel_eval_pgn(pgn_file_path: str, num_processes: int):
 
 
 def main(args):
-    # for pgn_file_path in natsorted(glob.glob(os.path.join(args.output_dir, "*.pgn"))):
-        # parallel_eval_pgn(pgn_file_path, args.num_processes)
-
-    # eval_pgn("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn", 0, 0, math.inf)
     PrintInLine.reset()
     PrintInLine.print(1, "Concurently evaluating games...")
+
+    # pbar = PrintInLine.get_pbar_function(0)
+    # pgn_files = natsorted(glob.glob(os.path.join(args.output_dir, "*.pgn")))
+    # for idx, pgn_file_path in enumerate(pgn_files):
+    #     fnames = pgn_file_path.split("_")[-1].split(".")[0]
+    #     parallel_eval_pgn(pgn_file_path, args.num_processes)
+    #     pbar(idx, len(pgn_files), f"Evaluating: {fnames}", 2)
+
+    # eval_pgn("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn", 0, 0, math.inf)
     parallel_eval_pgn("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn", args.num_processes)
 
 if __name__ == "__main__":

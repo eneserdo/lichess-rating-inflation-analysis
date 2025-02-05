@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from utils import divide_pgn_file, progress_bar
+from utils import PrintInLine, divide_pgn_file
 
 CEILING = 1000
 INITIAL_CP = 15

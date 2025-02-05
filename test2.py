@@ -1,4 +1,6 @@
 import math
+import random
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -107,5 +109,17 @@ def plot_accuracy():
                 edgecolor='none')
 
 if __name__ == '__main__':
-    plot_winpercent()
-    plot_accuracy()
+    # plot_winpercent()
+    # plot_accuracy()
+    from utils import PrintInLine
+    PrintInLine.reset()
+    pbar = PrintInLine.get_pbar_function()
+    pbar2 = PrintInLine.get_pbar_function()
+
+    for i in range(100):
+        if i == 50:
+            pbar2 = PrintInLine.get_pbar_function()
+        pbar(i, 100, "Hello World", 4, update_period=0)
+        time.sleep(random.random() * 0.1)
+        pbar2(2*i, 100, "Hello", 5, update_period=0)
+        time.sleep(random.random() * 0.1)
