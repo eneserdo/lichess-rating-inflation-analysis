@@ -174,8 +174,8 @@ def main(args):
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Analyse pgn files")
-    arg_parser.add_argument("-o", "--output_dir", type=str, default="lichess_db", help="Output directory")
-    arg_parser.add_argument("-p", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
+    arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Directory to process pgn files")
+    arg_parser.add_argument("-np", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
     args = arg_parser.parse_args()
 
     main(args)
