@@ -1,3 +1,6 @@
 wget
 zstandard
 chess
+matplotlib
+numpy
+seaborn

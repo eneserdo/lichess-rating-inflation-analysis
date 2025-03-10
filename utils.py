@@ -6,6 +6,7 @@ from pprint import pprint
 
 import chess
 import chess.pgn
+import zstandard
 
 import config as cfg
 
@@ -101,7 +102,7 @@ def divide_pgn_file(file_path, num_processes):
 
     return boundaries
 
-def count_games(pgn_file_path: str):
+def count_games(pgn_file_path: str, return_counter: bool = False):
     counter = {tempo: {mean: 0 for mean in cfg.RATING_BIN_MEANS} for tempo in cfg.TIME_CONTROL.keys()}
 
     with open(pgn_file_path, "r") as f:
@@ -116,12 +117,33 @@ def count_games(pgn_file_path: str):
                 counter[tempo][bin] += 1
             count += 1
     
-    print(f"Total games: {count}")
-    pprint(counter)
+    # print(f"Total games: {count}")
+    # pprint(counter)
+    if return_counter:
+        return counter
+    else:
+        return count
+
+
+def compress_pgn_files(pgn_files):
+    """
+    Compress the pgn files using zstd.
+    """
+    for pgn_file in pgn_files:
+        with open(pgn_file, "rb") as f:
+            zstd_compressor = zstandard.ZstdCompressor()
+            compressed_file = pgn_file+".zst"
+
+            with open(compressed_file, "wb") as f_out:
+                zstd_compressor.copy_stream(f, f_out)
+            
+        print(f"Compressed {pgn_file} to {compressed_file}")
 
 
 if __name__ == "__main__":
     count_games("lichess_db/lichess_db_standard_rated_2018-01_filtered.pgn")
+    # count_games("sample/subset_evaluated.pgn")
+
     # PrintInLine.print(1, "Hello")
     # PrintInLine.print(2, "World")
     # PrintInLine.print(3, "Helloasdfasdf")

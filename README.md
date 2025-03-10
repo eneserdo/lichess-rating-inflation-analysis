@@ -20,24 +20,27 @@ You also need to install [stockfish](https://stockfishchess.org/) in your system
 ### Run
 
 ```bash
-# Download and filter the database according to the config.py file.
-python prepare.py -t <num_threads_for_downloading> -p <num_processes_for_filtering>
+# Download and filter the database according to the config.py file, and save the filtered pgn files
+python prepare.py -nt <num_threads_for_downloading> -np <num_processes_for_filtering>
 
-# Run the engine on each pgn file in parallel and save as evaluated pgn files
-python evaluate.py -p <num_processes>
+# Run the engine on each pgn file in parallel and save the evaluated pgn files
+python evaluate.py -np <num_processes>
 
 # Calculate the game accuracy and some other metrics, and save as json files per pgn file
-python analyse.py 
+python analyse.py -np <num_processes>
 
 # Plot the data
 python plot.py
 ```
 
+All these scripts takes a very long time to run, but they work in a persistent way, meaning that if you interrupt the script, it will resume from where it left off in the next run.
 
-All these scripts takes a very long time to run, but they work in a persistent way, so that if you stop the process, it will resume from where it left off in the next run.
-
-All of these scripts took me 200 hours to run.
+All of these scripts roughly took me 100 hours to run.
 
 ## Download
 
-You can download the evaluated pgn files from [here](...). If you want to use the data for your research, please cite this repository properly.
+You can download the evaluated pgn files from [here](https://drive.google.com/drive/folders/1CQZXxX6HBY9g_TgmYfWB3hQWO3qICvH9?usp=sharing). If you want to use the data for your research, please cite this repository properly.
+
+## Known issues
+
+- Somehow, I could not exploit the threading and hashing features of Stockfish. During my toy runs, I could not see any performance improvements when varying the number of threads and hash values. I suspect the python-chess package because `stockfish bench` works fine.
