@@ -82,7 +82,6 @@ def is_game_valid(game_headers: dict) -> bool:
     )
 
 
-
 def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict, lock):
     filtered_game_offsets = []
     # print(f"Processing {idx} from {start/1024**3:.2f} GB to {end/1024**3:.2f} GB", flush=True)
@@ -113,6 +112,11 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
                         if counter[tempo][bin] < cfg.NUM_GAMES_PER_MONTH:
                             counter[tempo][bin] += 1
                             filtered_game_offsets.append(curr)
+                            counter["total"].value += 1                                                
+                            # Stop if we have enough games
+                            if counter["total"].value >= cfg.TOTAL_NUM_GAMES:
+                                break
+ 
 
             curr = pgn_db.tell()
 
@@ -143,6 +147,7 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
         
     with mp.Manager() as manager:
         counter = {tempo: manager.dict({mean: 0 for mean in cfg.RATING_BIN_MEANS}) for tempo in cfg.TIME_CONTROL.keys()}
+        counter["total"] = manager.Value("i", 0)
 
         counter = manager.dict(counter)
         lock = manager.Lock()
@@ -228,9 +233,9 @@ def main(args):
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Download and filter lichess games")
-    arg_parser.add_argument("-o", "--output_dir", type=str, default="lichess_db", help="Output directory (default: lichess_db)")
-    arg_parser.add_argument("-p", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
-    arg_parser.add_argument("-t", "--num_threads", type=int, default=3, help="Number of threads to use for downloading (default 3)")
+    arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Directory to save and filter pgn files (default: lichess_db)")
+    arg_parser.add_argument("-np", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
+    arg_parser.add_argument("-nt", "--num_threads", type=int, default=3, help="Number of threads to use for downloading (default 3)")
     args = arg_parser.parse_args()
     
     main(args)
