@@ -11,6 +11,7 @@ import chess
 import chess.pgn
 import wget
 import zstandard
+from natsort import natsorted
 
 import config as cfg
 from utils import (PrintInLine, divide_pgn_file, get_rating_bin,
@@ -79,6 +80,7 @@ def is_game_valid(game_headers: dict) -> bool:
         and (int(game_headers.get("WhiteRatingDiff").replace("+", "").replace("-", "")) < 15) 
         and (int(game_headers.get("BlackRatingDiff").replace("+", "").replace("-", "")) < 15) 
         and (abs(int(game_headers.get("WhiteElo")) - int(game_headers.get("BlackElo"))) < 50) 
+        and (game_headers.get("TimeControl") is not None)
     )
 
 
@@ -87,6 +89,9 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
     # print(f"Processing {idx} from {start/1024**3:.2f} GB to {end/1024**3:.2f} GB", flush=True)
     
     pgn_name = pgn_db_path[:-4].split("_")[-1]
+    fname_to_save = pgn_db_path[:-4] + f"_filtered_p{idx}.pgn"
+    if os.path.exists(fname_to_save):
+        return True
 
     with open(pgn_db_path) as pgn_db:
         pgn_db.seek(start)
@@ -112,18 +117,18 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
                         if counter[tempo][bin] < cfg.NUM_GAMES_PER_MONTH:
                             counter[tempo][bin] += 1
                             filtered_game_offsets.append(curr)
-                            counter["total"].value += 1                                                
-                            # Stop if we have enough games
-                            if counter["total"].value >= cfg.TOTAL_NUM_GAMES:
-                                break
- 
+                            counter["total"].value += 1
+                            PrintInLine.print(3+NUM_THREADS+NUM_PROCESSES, f"Filtered games: {counter['total'].value}/{cfg.TOTAL_NUM_GAMES}")
 
+ 
+            # Stop if we have enough games
+            if counter["total"].value >= cfg.TOTAL_NUM_GAMES: 
+                break
             curr = pgn_db.tell()
 
     # save to file
-    fname = pgn_db_path[:-4] + f"_filtered_p{idx}.pgn"
     with open(pgn_db_path) as pgn_db:
-        with open(fname, "w") as f:
+        with open(fname_to_save, "w") as f:
             exporter = chess.pgn.FileExporter(f)
             for offset in filtered_game_offsets:
                 pgn_db.seek(offset)
@@ -156,7 +161,7 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
             args = [(pgn_db_path, idx, start, end, counter, lock) for idx, (start, end) in enumerate(boundaries)]
             results = pool.starmap(filter_games, args, chunksize=1)
 
-    PrintInLine.print(3+NUM_THREADS + NUM_PROCESSES, "Combining filtered files...")
+    PrintInLine.print(3 + NUM_THREADS + NUM_PROCESSES + 1, "Combining filtered files...")
 
     os.system(f"cat {pgn_db_path[:-4]}*_filtered_p*.pgn > {pgn_db_path[:-4]}_filtered.pgn")
     os.system(f"rm {pgn_db_path[:-4]}*_filtered_p*.pgn")
@@ -178,7 +183,7 @@ def processor_process(filter_queue, num_processes):
         end = time.perf_counter()
 
         pgn_name = pgn_path[:-8].split("_")[-1]
-        PrintInLine.print(3+NUM_THREADS + NUM_PROCESSES, f"Filtered {pgn_name} in {end-start:.2f}s")
+        PrintInLine.print(3 + NUM_THREADS + NUM_PROCESSES, f"Filtered {pgn_name} in {end-start:.2f}s")
 
 
 def main(args):
@@ -191,9 +196,8 @@ def main(args):
     dates = []
 
     skip_dates = []
-    for year, month in product(range(2018, 2025), range(1, 13, cfg.EVERY_N_MONTHS)):
-        date = f"{year}-{month:02d}"
-        if os.path.exists(opj(args.output_dir, f"lichess_db_standard_rated_{date}_filtered.pgn")):
+    for date in cfg.DATES:
+        if os.path.exists(opj(args.pgn_dir, f"lichess_db_standard_rated_{date}_filtered.pgn")):
             skip_dates.append(date)
         else:
             dates.append(date)
@@ -209,13 +213,13 @@ def main(args):
         with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
             futures = []
             for idx, date in enumerate(dates):
-                futures.append(executor.submit(download_db, date, args.output_dir, idx))
+                futures.append(executor.submit(download_db, date, args.pgn_dir, idx))
 
             for future in as_completed(futures):
                 pgn_path = future.result()
                 filter_queue.put(pgn_path)
     else:
-        not_yet_filtered = glob.glob(opj(args.output_dir, "lichess_db_standard_rated_*"))
+        not_yet_filtered = natsorted(glob.glob(opj(args.pgn_dir, "lichess_db_standard_rated_*")))
         for pgn_path in not_yet_filtered:
             if "filtered" not in pgn_path:
                 if "zst" in pgn_path:
