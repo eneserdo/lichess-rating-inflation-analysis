@@ -1,8 +1,14 @@
 # Research Questions
 
+0. Rating is just an estimation of the skill. A more fine-grained estimation might be game accuracy or number of misplays/errors.
+    - Formulation of centipawns -> win percentage -> accuracy per move -> accuracy per game
+    -                                             -> misplay/error count (blunder, mistake, inaccuracy)
+
 1. How ratings of the players and accuracy of moves are correlated in chess?
     - How this correlation evolves over time?
-    - Average move accuracy and rating which is the best estimator for player's strength?
+    - How much the accuracy and number of mistakes differts between Players with similar ratings?
+    - How much the accuracy and number of mistakes differts between, for instance, Players with 1500 rating and 1700 rating?
+
 2. Is there an inflation or deflation in ratings?
     - Definition of inflation/deflation
     - show for specific rating categories how their accuracy evolves over time
@@ -12,7 +18,7 @@
 3. Choosing a sample of players, how their ratings and accuracy evolve over time?
 
 We are omitting some nuances of the game:
-- In different game phases or when there is not much time, move accuracy might change. We are basically averaging all moves hoping that in average those effects will cancel out.
+- In different game phases or when there is not much time, move accuracy might change. We are basically averaging all moves assuming that in average those effects will cancel out.
 
 # Data/Preprocessing
 

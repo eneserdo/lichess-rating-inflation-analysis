@@ -89,7 +89,7 @@ def main(args):
         end = perf_counter()
 
         game_count = count_games(pgn_file_path)
-        PrintInLine.print(3+args.num_processes+1, f"{fnames} is done. Elapsed time: {end - start:.2f} s, {end - start / game_count:.2f} s/g")
+        PrintInLine.print(3+args.num_processes+1, f"{fnames} is done. Elapsed time: {end - start:.2f} s, {(end - start) / game_count:.2f} s/g")
 
 
 if __name__ == "__main__":
