@@ -14,8 +14,7 @@ import zstandard
 from natsort import natsorted
 
 import config as cfg
-from utils import (PrintInLine, divide_pgn_file, get_rating_bin,
-                   get_time_control)
+from utils import PrintInLine, divide_pgn_file, get_rating_bin, get_time_control
 
 NUM_PROCESSES = None
 NUM_THREADS = None
@@ -25,7 +24,8 @@ def decompress_db(file_path: str) -> str:
     """
     Decompress the file if it is not already decompressed.
     """
-    PrintInLine.print(3+NUM_THREADS, "Decompressing...")
+    msg = f"Decompressing {file_path.split('_')[-1].split('.')[0]}"
+    PrintInLine.print(3+NUM_THREADS, msg)
 
     # check if the file is already decompressed
     if os.path.exists(file_path[:-4]):
@@ -111,13 +111,25 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
                 mean_rating = (int(game_headers.get("WhiteElo")) + int(game_headers.get("BlackElo"))) / 2
                 bin = get_rating_bin(mean_rating)
                 tempo = get_time_control(game_headers.get("TimeControl"))
+                white_name = game_headers.get("White")
+                black_name = game_headers.get("Black")
                 
                 if tempo is not None and bin is not None:
                     with lock:
-                        if counter[tempo][bin] < cfg.NUM_GAMES_PER_MONTH:
+                        if white_name not in counter["players"]:
+                            counter["players"][white_name] = 0
+                        if black_name not in counter["players"]:
+                            counter["players"][black_name] = 0
+                        
+                        if counter[tempo][bin] < cfg.NUM_GAMES_PER_MONTH and \
+                            counter["players"][white_name] < cfg.MAX_GAMES_PER_PLAYER and \
+                            counter["players"][black_name] < cfg.MAX_GAMES_PER_PLAYER:
+                            
                             counter[tempo][bin] += 1
                             filtered_game_offsets.append(curr)
                             counter["total"].value += 1
+                            counter["players"][white_name] += 1
+                            counter["players"][black_name] += 1
                             PrintInLine.print(3+NUM_THREADS+NUM_PROCESSES, f"Filtered games: {counter['total'].value}/{cfg.TOTAL_NUM_GAMES}")
 
  
@@ -153,6 +165,7 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
     with mp.Manager() as manager:
         counter = {tempo: manager.dict({mean: 0 for mean in cfg.RATING_BIN_MEANS}) for tempo in cfg.TIME_CONTROL.keys()}
         counter["total"] = manager.Value("i", 0)
+        counter["players"] = manager.dict()
 
         counter = manager.dict(counter)
         lock = manager.Lock()
@@ -161,7 +174,8 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
             args = [(pgn_db_path, idx, start, end, counter, lock) for idx, (start, end) in enumerate(boundaries)]
             results = pool.starmap(filter_games, args, chunksize=1)
 
-    PrintInLine.print(3 + NUM_THREADS + NUM_PROCESSES + 1, "Combining filtered files...")
+    msg = f"cat'ing all parts for {pgn_db_path.split('_')[-1].split('.')[0]}"
+    PrintInLine.print(3 + NUM_THREADS + NUM_PROCESSES + 1, msg)
 
     os.system(f"cat {pgn_db_path[:-4]}*_filtered_p*.pgn > {pgn_db_path[:-4]}_filtered.pgn")
     os.system(f"rm {pgn_db_path[:-4]}*_filtered_p*.pgn")
