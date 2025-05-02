@@ -1,7 +1,9 @@
 import datetime
+import glob
 import os
 import sys
 import time
+from collections import defaultdict
 from pprint import pprint
 
 import chess
@@ -124,6 +126,28 @@ def count_games(pgn_file_path: str, return_counter: bool = False):
     else:
         return count
 
+def count_games2(pgn_file_path: str, return_counter: bool = False):
+    counter = {tempo: {mean: 0 for mean in cfg.RATING_BIN_MEANS} for tempo in cfg.TIME_CONTROL.keys()}
+
+    with open(pgn_file_path, "r") as f:
+        count = 0
+        while True:
+            game_header = chess.pgn.read_headers(f)
+            if game_header is None:
+                break
+            # bin = get_rating_bin((int(game_header["WhiteElo"]) + int(game_header["BlackElo"])) / 2)
+            # tempo = get_time_control(game_header["TimeControl"])
+            # if tempo is not None and bin is not None:
+            #     counter[tempo][bin] += 1
+            count += 1
+    
+    # print(f"Total games: {count}")
+    # pprint(counter)
+    if return_counter:
+        return counter
+    else:
+        return count
+
 
 def compress_pgn_files(pgn_files):
     """
@@ -140,8 +164,40 @@ def compress_pgn_files(pgn_files):
         print(f"Compressed {pgn_file} to {compressed_file}")
 
 
+def count_players(pgn_file_path: str):
+    counter = {} # {player_name: number_of_games}
+
+    with open(pgn_file_path, "r") as f:
+        count = 0
+        while True:
+            game_header = chess.pgn.read_headers(f)
+            if game_header is None:
+                break
+            count += 1
+            if game_header["White"] not in counter:
+                counter[game_header["White"]] = 0
+            if game_header["Black"] not in counter:
+                counter[game_header["Black"]] = 0
+            counter[game_header["White"]] += 1
+            counter[game_header["Black"]] += 1
+
+    return counter
+
+
+def check_player_distribution(pgn_file_path: str):
+    for file in glob.glob(os.path.join(pgn_file_path, "*filtered.pgn")):
+        counter = count_players(file)
+        # get the most common player
+        most_common_player = max(counter, key=counter.get)
+        print(f"Most common player: {most_common_player} with {counter[most_common_player]} games in {file.split('/')[-1]}")
+
+
 if __name__ == "__main__":
-    count_games("lichess_db/lichess_db_standard_rated_2018-01_filtered.pgn")
+    start=time.perf_counter()
+    counter=count_games2("dummy_db/dummy64.pgn")
+    end=time.perf_counter()
+    print(f"Time taken: {end-start} seconds")
+    pprint(counter)
     # count_games("sample/subset_evaluated.pgn")
 
     # PrintInLine.print(1, "Hello")
@@ -150,3 +206,6 @@ if __name__ == "__main__":
     # time.sleep(1)
     # PrintInLine.print(3, "Hello")
     # PrintInLine.print(4, "World")
+    # c=count_players("lichess_db/lichess_db_standard_rated_2018-01_filtered.pgn")
+    # pprint(c)
+    # check_player_distribution("lichess_db")
