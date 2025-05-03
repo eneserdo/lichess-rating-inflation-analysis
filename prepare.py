@@ -14,11 +14,12 @@ import zstandard
 from natsort import natsorted
 
 import config as cfg
-from utils import PrintInLine, divide_pgn_file, get_rating_bin, get_time_control
+from utils import (PrintInLine, divide_pgn_file, get_rating_bin,
+                   get_time_control)
 
 NUM_PROCESSES = None
 NUM_THREADS = None
-
+STATS_TIME = None
 
 def decompress_db(file_path: str) -> str:
     """
@@ -130,7 +131,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
                             counter["total"].value += 1
                             counter["players"][white_name] += 1
                             counter["players"][black_name] += 1
-                            PrintInLine.print(3+NUM_THREADS+NUM_PROCESSES, f"Filtered games: {counter['total'].value}/{cfg.TOTAL_NUM_GAMES}")
+                            PrintInLine.print(3+NUM_THREADS+NUM_PROCESSES, f"Filtered games: {counter['total'].value}/{cfg.TOTAL_NUM_GAMES} in {time.perf_counter()-STATS_TIME:.2f}s")
 
  
             # Stop if we have enough games
@@ -153,6 +154,9 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
 
 def parallel_filter_games(pgn_db_path: str, num_processes: int):
     # pgn_db_path: path to the zst file
+    global STATS_TIME
+    STATS_TIME = time.perf_counter()
+    
     
     pgn_db_path_decompressed = decompress_db(pgn_db_path)
     if os.path.exists(pgn_db_path):
