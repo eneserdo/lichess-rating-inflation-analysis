@@ -1,5 +1,6 @@
 import argparse
 import glob
+import mmap
 import multiprocessing as mp
 import os
 import time
@@ -87,34 +88,98 @@ def is_game_valid(game_headers: dict) -> bool:
     )
 
 
+def divide_pgn_file_for_mmap(file_path, num_partitions):
+    """
+    Divide the file into approximately equal parts. It complies with the requirements of mmap (offset must be multiple of ALLOCATIONGRANULARITY, length can be anything).
+    # TODO: Is it possible to have a game > ALLOCATIONGRANULARITY ?
+    """
+    file_size = os.path.getsize(file_path)
+    page_size = mmap.ALLOCATIONGRANULARITY
+
+    assert file_size >= page_size, f"File is smaller than the page size: {file_size:_} < {page_size:_}"
+
+
+    chunk_size = file_size // num_partitions
+    boundaries = [i * chunk_size for i in range(num_partitions)]
+    boundaries.append(file_size)  # Ensure the last chunk covers the end
+
+    # align starts to the page size
+    boundary_pairs = []
+    for i in range(1, len(boundaries)):
+        start = boundaries[i-1]
+        aligned_start = (start + page_size - 1) // page_size * page_size
+        end = boundaries[i]
+        boundary_pairs.append([aligned_start, end])
+
+    del boundaries
+
+    # shift the ends to cover all the games
+    with open(file_path) as pgn_db:
+        for idx, (start, end) in enumerate(boundary_pairs[:-1]):
+            # Align start to page boundary
+
+            pgn_db.seek(end)
+            line = pgn_db.readline()
+            while not line.startswith("[Event"):
+                line = pgn_db.readline()
+            boundary_pairs[idx][1] = pgn_db.tell() - len(line)
+
+    # Basically, ends respect the game boundaries, but starts are aligned to the page size
+    # When using mmap, at the beginning of the file, consume the first partial game
+    return boundary_pairs
+
+def _consume_first_game(mmap_file):
+    line = mmap_file.readline()
+    while not line.startswith(b"[Event"):
+        # print("c", end="", flush=True)
+        line = mmap_file.readline()
+    # print()
+    mmap_file.seek(mmap_file.tell() - len(line))
+
+
+def get_game_headers(game_lines):
+    header = {}
+    for line in game_lines:
+        if not line.startswith(b"["):
+            continue
+        key, value = line.split(b" ", 1)
+        key = key.strip(b"[").decode()
+        value = value.strip().strip(b"]").strip(b"\"").decode()
+        header[key] = value
+    
+    return header
+
 def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
     
     pgn_name = pgn_db_path[:-4].split("_")[-1]
     fname_to_save = pgn_db_path[:-4] + f"_filtered_p{idx}.txt"
 
     with open(pgn_db_path) as pgn_db, open(fname_to_save, "w") as f_out:
-        pgn_db.seek(start)
-        
-        pbar = PrintInLine.get_pbar_function()
-
-        curr = pgn_db.tell()
-        while curr < end:
-            pbar(curr - start, end - start, f"Filtering {pgn_name} p{idx:02d}", 3 + NUM_THREADS + idx)
-
-            game_headers = chess.pgn.read_headers(pgn_db)
-            if game_headers is None:
-                break
+        with mmap.mmap(pgn_db.fileno(), length=end - start, access=mmap.ACCESS_READ, offset=start) as mmap_file:
+            _consume_first_game(mmap_file)
             
-            if is_game_valid(game_headers):
-                w_name, b_name = game_headers.get("White"), game_headers.get("Black")
-                w_elo, b_elo = game_headers.get('WhiteElo'), game_headers.get('BlackElo')
-                result = game_headers.get('Result')
-                time_control = game_headers.get('TimeControl')
-                
-                game_info = f"{w_name} {b_name} {w_elo} {b_elo} {result} {time_control} {curr}\n"
-                f_out.write(game_info)
+            pbar = PrintInLine.get_pbar_function()
+            game_lines = [mmap_file.readline()]
 
-            curr = pgn_db.tell()
+            while mmap_file.tell() < end-start: 
+                line = mmap_file.readline()
+                curr = mmap_file.tell()
+                pbar(curr, end - start, f"Filtering {pgn_name} p{idx:02d}", 3 + NUM_THREADS + idx)
+
+                if not line.startswith(b"[Event"):
+                    game_lines.append(line)
+                else:
+                    game_headers = get_game_headers(game_lines)
+                    game_lines = [line]
+                    
+                    if is_game_valid(game_headers):
+                        w_name, b_name = game_headers.get("White"), game_headers.get("Black")
+                        w_elo, b_elo = game_headers.get('WhiteElo'), game_headers.get('BlackElo')
+                        result = game_headers.get('Result')
+                        time_control = game_headers.get('TimeControl')
+                        
+                        game_info = f"{w_name} {b_name} {w_elo} {b_elo} {result} {time_control} {curr + start}\n"
+                        f_out.write(game_info)
 
     return True
 
@@ -158,7 +223,7 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
         os.remove(pgn_db_path)
     pgn_db_path = pgn_db_path_decompressed
 
-    boundaries = divide_pgn_file(pgn_db_path, num_processes)
+    boundaries = divide_pgn_file_for_mmap(pgn_db_path, num_processes)
 
     with mp.Pool(num_processes) as pool:
         args = [(pgn_db_path, idx, start, end) for idx, (start, end) in enumerate(boundaries)]
