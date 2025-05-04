@@ -5,7 +5,6 @@ import os
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from itertools import product
 from os.path import join as opj
 from pathlib import Path
 
@@ -137,6 +136,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
     return True
 
 def extract_games(game_info_path: str, pgn_path: str):
+    start_time = time.perf_counter()
     counter = {tempo: {mean: 0 for mean in cfg.RATING_BIN_MEANS} for tempo in cfg.TIME_CONTROL.keys()}
     counter["total"] = 0
     counter["players"] = defaultdict(int)
@@ -171,6 +171,9 @@ def extract_games(game_info_path: str, pgn_path: str):
             
             if counter["total"] >= cfg.TOTAL_NUM_GAMES:
                 break
+    
+    end_time = time.perf_counter()
+    PrintInLine.print(3 + NUM_THREADS + NUM_PROCESSES + 1, f"Extracted {counter['total']} games from {pgn_path.split('_')[-1].split('.')[0]} in {end_time-start_time:.2f}s")
 
 
 def parallel_filter_games(pgn_db_path: str, num_processes: int):
