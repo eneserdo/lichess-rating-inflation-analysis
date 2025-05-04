@@ -3,9 +3,11 @@ import glob
 import multiprocessing as mp
 import os
 import time
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import product
 from os.path import join as opj
+from pathlib import Path
 
 import chess
 import chess.pgn
@@ -85,16 +87,12 @@ def is_game_valid(game_headers: dict) -> bool:
     )
 
 
-def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict, lock):
-    filtered_game_offsets = []
-    # print(f"Processing {idx} from {start/1024**3:.2f} GB to {end/1024**3:.2f} GB", flush=True)
+def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
     
     pgn_name = pgn_db_path[:-4].split("_")[-1]
-    fname_to_save = pgn_db_path[:-4] + f"_filtered_p{idx}.pgn"
-    if os.path.exists(fname_to_save):
-        return True
+    fname_to_save = pgn_db_path[:-4] + f"_filtered_p{idx}.txt"
 
-    with open(pgn_db_path) as pgn_db:
+    with open(pgn_db_path) as pgn_db, open(fname_to_save, "w") as f_out:
         pgn_db.seek(start)
         
         pbar = PrintInLine.get_pbar_function()
@@ -105,52 +103,49 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int, counter: dict
 
             game_headers = chess.pgn.read_headers(pgn_db)
             if game_headers is None:
-                print("WTF")
                 break
             
             if is_game_valid(game_headers):
-                mean_rating = (int(game_headers.get("WhiteElo")) + int(game_headers.get("BlackElo"))) / 2
-                bin = get_rating_bin(mean_rating)
-                tempo = get_time_control(game_headers.get("TimeControl"))
-                white_name = game_headers.get("White")
-                black_name = game_headers.get("Black")
+                w_name, b_name = game_headers.get("White"), game_headers.get("Black")
+                w_elo, b_elo = game_headers.get('WhiteElo'), game_headers.get('BlackElo')
+                result = game_headers.get('Result')
+                time_control = game_headers.get('TimeControl')
                 
-                if tempo is not None and bin is not None:
-                    with lock:
-                        if white_name not in counter["players"]:
-                            counter["players"][white_name] = 0
-                        if black_name not in counter["players"]:
-                            counter["players"][black_name] = 0
-                        
-                        if counter[tempo][bin] < cfg.NUM_GAMES_PER_MONTH and \
-                            counter["players"][white_name] < cfg.MAX_GAMES_PER_PLAYER and \
-                            counter["players"][black_name] < cfg.MAX_GAMES_PER_PLAYER:
-                            
-                            counter[tempo][bin] += 1
-                            filtered_game_offsets.append(curr)
-                            counter["total"].value += 1
-                            counter["players"][white_name] += 1
-                            counter["players"][black_name] += 1
-                            PrintInLine.print(3+NUM_THREADS+NUM_PROCESSES, f"Filtered games: {counter['total'].value}/{cfg.TOTAL_NUM_GAMES} in {time.perf_counter()-STATS_TIME:.2f}s")
+                game_info = f"{w_name} {b_name} {w_elo} {b_elo} {result} {time_control} {curr}\n"
+                f_out.write(game_info)
 
- 
-            # Stop if we have enough games
-            if counter["total"].value >= cfg.TOTAL_NUM_GAMES: 
-                break
             curr = pgn_db.tell()
-
-    # save to file
-    with open(pgn_db_path) as pgn_db:
-        with open(fname_to_save, "w") as f:
-            exporter = chess.pgn.FileExporter(f)
-            for offset in filtered_game_offsets:
-                pgn_db.seek(offset)
-                game = chess.pgn.read_game(pgn_db)
-                game.accept(exporter)
 
     return True
 
+def extract_games(game_info_path: str, pgn_path: str):
+    counter = {tempo: {mean: 0 for mean in cfg.RATING_BIN_MEANS} for tempo in cfg.TIME_CONTROL.keys()}
+    counter["total"] = 0
+    counter["players"] = defaultdict(int)
 
+    with open(game_info_path) as game_info, open(pgn_path, "r") as pgn_db, open(pgn_path[:-4] + "_filtered.pgn", "w") as pgn_filtered:
+        exporter = chess.pgn.FileExporter(pgn_filtered)
+        
+        for line in game_info:
+            white, black, white_elo, black_elo, result, time_control, offset = line.strip().split(" ")
+            
+            if counter["players"][white] >= cfg.MAX_GAMES_PER_PLAYER or counter["players"][black] >= cfg.MAX_GAMES_PER_PLAYER:
+                continue
+            
+            tempo = get_time_control(time_control)
+            bin = get_rating_bin((int(white_elo) + int(black_elo)) / 2)
+            
+            if tempo is None or bin is None:
+                continue
+            
+            if counter[tempo][bin] < cfg.NUM_GAMES_PER_CONFIG:
+                counter[tempo][bin] += 1
+                pgn_db.seek(int(offset))
+                game = chess.pgn.read_game(pgn_db)
+                game.accept(exporter)
+            
+            if counter["total"] >= cfg.TOTAL_NUM_GAMES:
+                break
 
 def parallel_filter_games(pgn_db_path: str, num_processes: int):
     # pgn_db_path: path to the zst file
@@ -164,26 +159,21 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
     pgn_db_path = pgn_db_path_decompressed
 
     boundaries = divide_pgn_file(pgn_db_path, num_processes)
-    
-        
-    with mp.Manager() as manager:
-        counter = {tempo: manager.dict({mean: 0 for mean in cfg.RATING_BIN_MEANS}) for tempo in cfg.TIME_CONTROL.keys()}
-        counter["total"] = manager.Value("i", 0)
-        counter["players"] = manager.dict()
 
-        counter = manager.dict(counter)
-        lock = manager.Lock()
-
-        with mp.Pool(num_processes) as pool:
-            args = [(pgn_db_path, idx, start, end, counter, lock) for idx, (start, end) in enumerate(boundaries)]
-            results = pool.starmap(filter_games, args, chunksize=1)
+    with mp.Pool(num_processes) as pool:
+        args = [(pgn_db_path, idx, start, end) for idx, (start, end) in enumerate(boundaries)]
+        results = pool.starmap(filter_games, args, chunksize=1)
 
     msg = f"cat'ing all parts for {pgn_db_path.split('_')[-1].split('.')[0]}"
     PrintInLine.print(3 + NUM_THREADS + NUM_PROCESSES + 1, msg)
 
-    os.system(f"cat {pgn_db_path[:-4]}*_filtered_p*.pgn > {pgn_db_path[:-4]}_filtered.pgn")
-    os.system(f"rm {pgn_db_path[:-4]}*_filtered_p*.pgn")
-    os.system(f"rm {pgn_db_path}")
+    os.system(f"cat {pgn_db_path[:-4]}*_filtered_p*.txt > {pgn_db_path[:-4]}_filtered.txt")
+    os.system(f"rm {pgn_db_path[:-4]}*_filtered_p*.txt")
+    
+    extract_games(pgn_db_path[:-4] + "_filtered.txt", pgn_db_path)
+
+    # os.system(f"rm {pgn_db_path[:-4]}_filtered.txt")
+    # os.system(f"rm {pgn_db_path}")
 
 
 def processor_process(filter_queue, num_processes):
@@ -254,10 +244,11 @@ def main(args):
 
 
 if __name__ == "__main__":
+
     arg_parser = argparse.ArgumentParser(description="Download and filter lichess games")
     arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Directory to save and filter pgn files (default: lichess_db)")
-    arg_parser.add_argument("-np", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
-    arg_parser.add_argument("-nt", "--num_threads", type=int, default=3, help="Number of threads to use for downloading (default 3)")
+    arg_parser.add_argument("-np", "--num_processes", type=int, default=4, help="Number of processes to use for filtering (default 8)")
+    arg_parser.add_argument("-nt", "--num_threads", type=int, default=0, help="Number of threads to use for downloading (default 3)")
     args = arg_parser.parse_args()
     
     main(args)
