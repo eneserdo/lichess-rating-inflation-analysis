@@ -168,6 +168,9 @@ def extract_games(game_info_path: str, pgn_path: str):
                 pgn_db.seek(int(offset))
                 game = chess.pgn.read_game(pgn_db)
                 game.accept(exporter)
+                counter["total"] += 1
+                counter["players"][white] += 1
+                counter["players"][black] += 1
             
             if counter["total"] >= cfg.TOTAL_NUM_GAMES:
                 break
