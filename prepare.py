@@ -23,6 +23,14 @@ NUM_PROCESSES = None
 NUM_THREADS = None
 STATS_TIME = None
 
+# print lines:
+#  1: "Concurently downloading and filtering games... Skipping..."
+#  "Filtered {pgn_name} in {end-start:.2f}s"
+#  "Decompressing {file_path.split('_')[-1].split('.')[0]}"
+#  "cat'ing all parts for {pgn_db_path.split('_')[-1].split('.')[0]}"
+#  "Filtered {pgn_name} in {end-start:.2f}s"
+
+
 def decompress_db(file_path: str) -> str:
     """
     Decompress the file if it is not already decompressed.
@@ -123,10 +131,17 @@ def extract_games(game_info_path: str, pgn_path: str):
     counter["total"] = 0
     counter["players"] = defaultdict(int)
 
+    pbar = PrintInLine.get_pbar_function()
+    fsize = os.path.getsize(game_info_path)
+    size_per_line = len(open(game_info_path).readline())
+    num_lines = fsize // size_per_line
+    
     with open(game_info_path) as game_info, open(pgn_path, "r") as pgn_db, open(pgn_path[:-4] + "_filtered.pgn", "w") as pgn_filtered:
         exporter = chess.pgn.FileExporter(pgn_filtered)
-        
-        for line in game_info:
+
+        for line_idx, line in enumerate(game_info):
+            pbar(line_idx, num_lines, f"Extracting games from {pgn_path.split('_')[-1].split('.')[0]}", 3 + NUM_THREADS + NUM_PROCESSES + 1)
+
             white, black, white_elo, black_elo, result, time_control, offset = line.strip().split(" ")
             
             if counter["players"][white] >= cfg.MAX_GAMES_PER_PLAYER or counter["players"][black] >= cfg.MAX_GAMES_PER_PLAYER:
@@ -146,6 +161,7 @@ def extract_games(game_info_path: str, pgn_path: str):
             
             if counter["total"] >= cfg.TOTAL_NUM_GAMES:
                 break
+
 
 def parallel_filter_games(pgn_db_path: str, num_processes: int):
     # pgn_db_path: path to the zst file
@@ -172,8 +188,8 @@ def parallel_filter_games(pgn_db_path: str, num_processes: int):
     
     extract_games(pgn_db_path[:-4] + "_filtered.txt", pgn_db_path)
 
-    # os.system(f"rm {pgn_db_path[:-4]}_filtered.txt")
-    # os.system(f"rm {pgn_db_path}")
+    os.system(f"rm {pgn_db_path[:-4]}_filtered.txt")
+    os.system(f"rm {pgn_db_path}")
 
 
 def processor_process(filter_queue, num_processes):
@@ -234,7 +250,8 @@ def main(args):
                     filter_queue.put(pgn_path)
                 else:
                     filter_queue.put(pgn_path+".zst")
-       
+
+    print("\n")   
     # Signal that we're done downloading
     filter_queue.put(None)
 
