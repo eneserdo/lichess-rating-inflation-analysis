@@ -20,7 +20,7 @@ from utils import (PrintInLine, divide_pgn_file, get_rating_bin,
 
 NUM_PROCESSES = None
 NUM_THREADS = None
-STATS_TIME = None
+FILTERING_START_TIME = None
 
 # print lines:
 #  1: "Concurently downloading and filtering games... Skipping..."
@@ -49,7 +49,7 @@ def decompress_db(file_path: str) -> str:
     return file_path[:-4]
 
 
-def download_db(date: str, output_dir: str, idx: int = None):
+def download_db(date: str, output_dir: str, idx: int):
     """
     Download the database for a given date and return the path to the file.
     If the file already exists, it will return the path to the file (*.zst).
@@ -181,8 +181,8 @@ def extract_games(game_info_path: str, pgn_path: str):
 
 def parallel_filter_games(pgn_db_path: str, num_processes: int):
     # pgn_db_path: path to the zst file
-    global STATS_TIME
-    STATS_TIME = time.perf_counter()
+    global FILTERING_START_TIME
+    FILTERING_START_TIME = time.perf_counter()
     
     
     pgn_db_path_decompressed = decompress_db(pgn_db_path)

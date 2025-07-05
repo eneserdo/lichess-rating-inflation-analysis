@@ -29,6 +29,7 @@ def get_time_control(time_control: str) -> str:
             return tempo
     return None
 
+# Printing to the console in a multiprocessed and multithreaded environment is a bit tricky
 class PrintInLine:
     def __new__(cls):
         raise Exception("This class is a singleton!")
@@ -45,7 +46,6 @@ class PrintInLine:
         sys.stdout.write("\033c")
         sys.stdout.flush()
 
-    # Progress bar in multiprocessed and multithreaded environment is a bit tricky
     # This is a simple but kind a hardcoded implementation that works for the current use case
     @staticmethod
     def get_pbar_function(update_period: int=100):
@@ -194,7 +194,7 @@ def check_player_distribution(pgn_file_path: str):
 
 if __name__ == "__main__":
     start=time.perf_counter()
-    counter=count_games2("dummy_db/dummy64.pgn")
+    counter=count_games2("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn")
     end=time.perf_counter()
     print(f"Time taken: {end-start} seconds")
     pprint(counter)

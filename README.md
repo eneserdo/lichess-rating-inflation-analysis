@@ -44,3 +44,8 @@ You can download the evaluated pgn files from [here](https://drive.google.com/dr
 ## Known issues
 
 - Somehow, I could not exploit the threading and hashing features of Stockfish. During my toy runs, I could not see any performance improvements when varying the number of threads and hash values. I suspect the python-chess package because `stockfish bench` works fine.
+
+
+## TODO
+
+- [ ] Add the analysis of the opening win rate.

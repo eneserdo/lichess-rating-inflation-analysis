@@ -11,18 +11,21 @@ from natsort import natsorted
 import config as cfg
 from utils import PrintInLine, count_games, divide_pgn_file
 
+THREADS = None
+HASH = None
 
-def eval_game(game: chess.pgn.Game, threads: int = -1, hash: int = -1) -> chess.pgn.Game:
+
+def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
     """
     Returns the evaluated game
     """
     root = game
     # This cant be parallelized because of the engine
     with chess.engine.SimpleEngine.popen_uci(cfg.STOCKFISH_PATH) as engine:
-        if threads != -1:
-            engine.configure({"Threads": threads})
-        if hash != -1:
-            engine.configure({"Hash": hash})
+        if THREADS is not None:
+            engine.configure({"Threads": THREADS})
+        if HASH is not None:
+            engine.configure({"Hash": HASH})
         while not game.is_end():
             game = game.next()
             analyse = engine.analyse(
@@ -72,6 +75,10 @@ def parallel_eval_pgn(pgn_file_path: str, num_processes: int):
 
 
 def main(args):
+    global THREADS, HASH
+    THREADS = args.threads
+    HASH = args.hash
+
     PrintInLine.reset()
     PrintInLine.print(1, "Concurently evaluating games...")
 
@@ -96,6 +103,9 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Evaluate pgn files with Stockfish")
     arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Directory to process pgn files")
     arg_parser.add_argument("-np", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
+    arg_parser.add_argument("-t", "--threads", type=int, default=None, help="Number of threads to use for evaluation (default None)")
+    arg_parser.add_argument("-hs", "--hash", type=int, default=None, help="Number of hash to use for evaluation (default None)")
     args = arg_parser.parse_args()
-    
+    THREADS = args.threads
+    HASH = args.hash
     main(args)
