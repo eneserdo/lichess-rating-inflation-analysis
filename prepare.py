@@ -15,8 +15,7 @@ import zstandard
 from natsort import natsorted
 
 import config as cfg
-from utils import (PrintInLine, divide_pgn_file, get_rating_bin,
-                   get_time_control)
+from utils import PrintInLine, divide_pgn_file, get_rating_bin, get_time_control
 
 NUM_PROCESSES = None
 NUM_THREADS = None
@@ -80,11 +79,13 @@ def is_game_valid(game_headers: dict) -> bool:
     - players with high rating deviation
     - anonymous players
     - games with high rating difference
+    - games with unknown ECO (it means game is abandoned without a move)
     """
     return (
         ("rated" in game_headers.get("Event").lower())
         and ("?" not in game_headers.get("White")) 
         and ("?" not in game_headers.get("Black"))
+        and ("?" not in game_headers.get("ECO"))
         and (game_headers.get("WhiteRatingDiff") is not None)
         and (game_headers.get("BlackRatingDiff") is not None)
         and (int(game_headers.get("WhiteRatingDiff").replace("+", "").replace("-", "")) < 15) 
