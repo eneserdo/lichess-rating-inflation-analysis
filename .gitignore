@@ -1,10 +1,13 @@
 lichess_db/
 dummy_db/
+temp_db/
 sample/
 lila/
-stockfish/
+stockfish*/
 .vscode/
 __pycache__/
 *.py[cod]
 *.png
 *.tmp
+temp/
+chess_metrics.db
