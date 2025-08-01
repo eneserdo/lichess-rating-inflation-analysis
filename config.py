@@ -12,10 +12,12 @@ TOTAL_NUM_GAMES = NUM_GAMES_PER_CONFIG * len(TIME_CONTROL.keys()) * len(RATING_B
 EVERY_N_MONTHS = 6
 DATES = [f"{year}-{month:02d}" for year in range(2017, 2025) for month in range(1, 13, EVERY_N_MONTHS)]
 
-# Variables related to the analyze.py
+# Variables related to the evaluate.py
 STOCKFISH_PATH = "./stockfish/stockfish-ubuntu-x86-64-avx2"
-STOCKFISH_DEPTH = 20
-
+STOCKFISH_LIMIT_DEPTH = None # depth (aka ply)
+STOCKFISH_LIMIT_TIME = 5 # seconds
+STOCKFISH_HASH_SIZE = None # None means use the default hash size
+STOCKFISH_THREADS = 2 # None means use the default threads
 
 # Variables related to the single_run.py
 PLAYERS = [

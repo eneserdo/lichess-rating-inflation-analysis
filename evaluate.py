@@ -13,8 +13,6 @@ from natsort import natsorted
 import config as cfg
 from utils import PrintInLine, count_games, divide_pgn_file
 
-THREADS = None
-HASH = None
 CHECKPOINT_DIR = Path("temp")
 CHECKPOINT_DIR.mkdir(exist_ok=True)
 
@@ -91,14 +89,19 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
     root = game
     # This cant be parallelized because of the engine
     with chess.engine.SimpleEngine.popen_uci(cfg.STOCKFISH_PATH) as engine:
-        if THREADS is not None:
-            engine.configure({"Threads": THREADS})
-        if HASH is not None:
-            engine.configure({"Hash": HASH})
+        config = {}
+        
+        if cfg.STOCKFISH_THREADS is not None:
+            config["Threads"] = cfg.STOCKFISH_THREADS
+        if cfg.STOCKFISH_HASH_SIZE is not None:
+            config["Hash"] = cfg.STOCKFISH_HASH_SIZE
+        if config:
+            engine.configure(config)
+        
         while not game.is_end():
             game = game.next()
             analyse = engine.analyse(
-                game.board(), chess.engine.Limit(depth=cfg.STOCKFISH_DEPTH)
+                game.board(), chess.engine.Limit(depth=cfg.STOCKFISH_LIMIT_DEPTH, time=cfg.STOCKFISH_LIMIT_TIME)
             )
             # print(analyse["score"])
             game.set_eval(analyse["score"])
@@ -191,9 +194,6 @@ def parallel_eval_pgn(pgn_file_path: str, num_processes: int):
 
 
 def main(args):
-    global THREADS, HASH
-    THREADS = args.threads
-    HASH = args.hash
 
     PrintInLine.reset()
     PrintInLine.print(1, "Concurrently evaluating games...")
@@ -212,14 +212,13 @@ def main(args):
         end = perf_counter()
 
         game_count = count_games(pgn_file_path)
-        PrintInLine.print(3+args.num_processes+1, f"{fnames} is done. Elapsed time: {end - start:.2f} s, {(end - start) / game_count:.2f} s/g")
+        elapsed_hours = (end - start) / 3600
+        PrintInLine.print(3+args.num_processes+1, f"{fnames} is done. Elapsed time: {elapsed_hours:.2f} h, {elapsed_hours / game_count:.2f} hours/game")
 
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Evaluate pgn files with Stockfish")
     arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Directory to process pgn files")
     arg_parser.add_argument("-np", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
-    arg_parser.add_argument("-t", "--threads", type=int, default=None, help="Number of threads to use for evaluation (default None)")
-    arg_parser.add_argument("-hs", "--hash", type=int, default=None, help="Number of hash to use for evaluation (default None)")
     args = arg_parser.parse_args()
     main(args)
