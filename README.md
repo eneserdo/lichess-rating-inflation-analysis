@@ -48,4 +48,5 @@ You can download the evaluated pgn files from [here](https://drive.google.com/dr
 
 ## TODO
 
-- [ ] Add the analysis of the opening win rate.
+- [ ] Find the ideal hash size, number of threads, and number of processes.
+

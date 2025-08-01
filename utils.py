@@ -192,12 +192,111 @@ def check_player_distribution(pgn_file_path: str):
         print(f"Most common player: {most_common_player} with {counter[most_common_player]} games in {file.split('/')[-1]}")
 
 
+def eval_benchmark(game: chess.pgn.Game, hash_size: int = None, num_threads: int = None, depth_limit: int = None, time_limit: int = None):
+    # This cant be parallelized because of the engine
+    with chess.engine.SimpleEngine.popen_uci(cfg.STOCKFISH_PATH) as engine:
+        config = {}
+        
+        if num_threads is not None:
+            config["Threads"] = num_threads
+        if hash_size is not None:
+            config["Hash"] = hash_size
+        if config:
+            engine.configure(config)
+        
+        while not game.is_end():
+            game = game.next()
+            analyse = engine.analyse(
+                game.board(), chess.engine.Limit(depth=depth_limit, time=time_limit)
+            )
+            game.set_eval(analyse["score"])
+
+
+def eval_benchmark_v2(game1: chess.pgn.Game, game2: chess.pgn.Game, hash_size: int = None, num_threads: int = None, depth_limit: int = None, time_limit: int = None):
+    # This cant be parallelized because of the engine
+    
+    
+    with chess.engine.SimpleEngine.popen_uci(cfg.STOCKFISH_PATH) as engine:
+        config = {}
+        
+        if num_threads is not None:
+            config["Threads"] = num_threads
+        if hash_size is not None:
+            config["Hash"] = hash_size
+        if config:
+            engine.configure(config)
+        
+        # First game
+        start = time.perf_counter()
+        while not game1.is_end():
+            game1 = game1.next()
+            analyse = engine.analyse(
+                game1.board(), chess.engine.Limit(depth=depth_limit, time=time_limit)
+            )
+            game1.set_eval(analyse["score"])
+
+        end = time.perf_counter()
+
+        g1 = end - start
+
+        # Second game (it is same as the first one)
+        start = time.perf_counter()
+        while not game2.is_end():
+            game2 = game2.next()
+            analyse = engine.analyse(
+                game2.board(), chess.engine.Limit(depth=depth_limit, time=time_limit)
+            )
+            game2.set_eval(analyse["score"])
+
+        end = time.perf_counter()
+        g2 = end - start
+
+        return g1, g2
+
 if __name__ == "__main__":
-    start=time.perf_counter()
-    counter=count_games2("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn")
-    end=time.perf_counter()
-    print(f"Time taken: {end-start} seconds")
-    pprint(counter)
+    # counter=count_games2("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn")
+
+
+    configs = [
+        {"depth_limit": 18, "hash_size": 16, "num_threads": 1},
+        {"depth_limit": 18, "hash_size": 16, "num_threads": 2},
+        {"depth_limit": 18, "hash_size": 16, "num_threads": 3},
+        {"depth_limit": 18, "hash_size": 16, "num_threads": 4},
+        {"depth_limit": 18, "hash_size": 16, "num_threads": 5},
+    ]
+
+    for config in configs:
+        n_runs = 5
+        times = []
+        
+        for run in range(n_runs):
+            with open("sample/new2.pgn") as f:
+                game = chess.pgn.read_game(f)
+            start = time.perf_counter()
+            game = eval_benchmark(game, **config)
+            end = time.perf_counter()
+            times.append(end - start)
+        
+        avg_time = sum(times) / len(times)
+        print(f"Average elapsed: {avg_time:.4f} s over {n_runs} runs for {config}")
+
+    # for hash_size in [32, 512, 1024, 2048]:
+    #     times_g1 = []
+    #     times_g2 = []
+    #     for run in range(10):
+    #         with open("sample/new2.pgn") as f:
+    #             game1 = chess.pgn.read_game(f)
+    #         with open("sample/new2.pgn") as f:
+    #             game2 = chess.pgn.read_game(f)
+
+    #         g1, g2 = eval_benchmark_v2(game1, game2, depth_limit=18, hash_size=hash_size, num_threads=1)
+    #         times_g1.append(g1)
+    #         times_g2.append(g2)
+
+    #     print(f"1st game: {sum(times_g1) / len(times_g1):.3f}, 2nd game: {sum(times_g2) / len(times_g2):.3f} s for hash_size: {hash_size}")
+
+
+    # pprint(game)
     # count_games("sample/subset_evaluated.pgn")
 
     # PrintInLine.print(1, "Hello")

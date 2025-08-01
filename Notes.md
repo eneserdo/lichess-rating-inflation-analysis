@@ -6,8 +6,8 @@
 
 1. How ratings of the players and accuracy of moves are correlated in chess?
     - How this correlation evolves over time?
-    - How much the accuracy and number of mistakes differts between Players with similar ratings?
-    - How much the accuracy and number of mistakes differts between, for instance, Players with 1500 rating and 1700 rating?
+    - How much the accuracy and number of mistakes differs between Players with similar ratings?
+    - How much the accuracy and number of mistakes differs between, for instance, Players with 1500 rating and 1700 rating?
 
 2. Is there an inflation or deflation in ratings?
     - Definition of inflation/deflation
@@ -63,3 +63,5 @@ for a move is how your move is close to the best move determined by Stockfish. S
 I am aware that in "masa başı" chess, there is a slight deflation in ratings. However, Me and many redditors have felt that in online chess, there is a more significant inflation.
 
 https://zwischenzug.substack.com/p/centipawns-suck
+
+Elo hell
