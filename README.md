@@ -4,7 +4,7 @@ There is a lot of talk about rating inflation in chess. I wanted to see if this 
 
 I will analyze the data in two ways: general trend in rating changes and rating changes of famous players.
 
-I downloaded the Lichess PGN database from 2018 to 2024 twice a year, and I picked N games from different rating ranges and time controls. Then, I run the engine on each game and save the centipawns and finally calculated the game accuracies that is specified by Lichess. 
+I downloaded the Lichess PGN database from 2018 to 2025 twice a year, and I picked N games from different rating ranges and time controls. Then, I run the engine on each game and save the centipawns and finally calculated the game accuracies that is specified by Lichess. 
 
 ## Reproducibility
 
@@ -27,7 +27,7 @@ python prepare.py -nt <num_threads_for_downloading> -np <num_processes_for_filte
 python evaluate.py -np <num_processes>
 
 # Calculate the game accuracy and some other metrics, and save the results to a sqlite database
-python analyse.py -np <num_processes>
+python analyse.py
 
 # Read the game metrics from the sqlite database and plot the results
 python plot.py
@@ -48,7 +48,11 @@ You can download the evaluated pgn files from [here](https://drive.google.com/dr
 
 ## TODO
 
-- [ ] Find the ideal hash size, number of threads, and number of processes.
+- [ ] Find the ideal hash size, number of threads, and number of processes (analyse.py).
 - [ ] Add a script for analysing games of a specific player (single_run.py).
 - [ ] Masabaşı satranç turnuvaları ?
 - [ ] Which statistical tools should we use?
+
+## Notes:
+
+- Do not optimize or spend too much time on prepare.py file.
