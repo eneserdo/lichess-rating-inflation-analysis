@@ -17,11 +17,17 @@ from utils import get_rating_bin, get_time_control
 CEILING = 1000
 INITIAL_CP = 15
 
+def round_to_int(value: float) -> int:
+    # to avoid bankers rounding
+    return math.floor(value + 0.5)
 
 def get_acpl(cps: List[float]) -> Tuple[float, float]:
-    cps = [INITIAL_CP] + cps
+    if len(cps) <= 1:
+        raise Exception("Not enough moves to calculate ACPL")
+    
     diffs = np.diff(np.array(cps))
 
+    # TODO: mat olunca cpl de nasıl hesaplanıyor kontrol et
     # # Filter out positions where mate was found
     # mate_mask = np.abs(evals) >= 9000
     # diffs = diffs[~mate_mask[:-1]]
@@ -35,7 +41,7 @@ def get_acpl(cps: List[float]) -> Tuple[float, float]:
     white_acpl = np.mean(np.maximum(white_diffs, 0))
     black_acpl = np.mean(np.maximum(black_diffs, 0))
 
-    return white_acpl, black_acpl
+    return round_to_int(white_acpl), round_to_int(black_acpl)
 
 
 def clip(value: int, min_val: int, max_val: int) -> int:
@@ -81,7 +87,7 @@ def harmonic_mean(values: List[float]) -> Optional[float]:
 
 
 # Based on https://github.com/lichess-org/lila/blob/4336bf020e746413e0039f1583a186442084bafa/modules/analyse/src/main/AccuracyPercent.scala#L81-L115
-def game_accuracy(cps: List[float]) -> Tuple[float, float]:
+def game_accuracy(cps: List[float]) -> Tuple[int, int]:
     """
     Calculate game accuracy for both colors
         cps: List of centipawn evaluations from white's perspective
@@ -91,12 +97,10 @@ def game_accuracy(cps: List[float]) -> Tuple[float, float]:
     # I assumed start_color is always white
 
     # Convert centipawns to win percentages (assuming we have this function)
-    all_win_percents = [centipawn_to_winpercent(INITIAL_CP)] + [
-        centipawn_to_winpercent(cp) for cp in cps
-    ]
+    all_win_percents = [centipawn_to_winpercent(cp) for cp in cps]
 
     # Calculate window size (10% of moves, between 2 and 8)
-    window_size = min(max(len(cps) // 10, 2), 8)
+    window_size = min(max((len(cps) - 1) // 10, 2), 8) # -1 because of the INITIAL_CP
 
     # Get raw win percent values
     # all_win_percent_values = [wp.value for wp in all_win_percents]
@@ -154,7 +158,7 @@ def game_accuracy(cps: List[float]) -> Tuple[float, float]:
         return (weighted + harm) / 2
 
     # Return accuracies for both colors
-    return color_accuracy(True), color_accuracy(False)
+    return round_to_int(color_accuracy(True)), round_to_int(color_accuracy(False))
 
 
 # Based on https://github.com/lichess-org/lila/blob/cf9e10df24b767b3bc5ee3d88c45437ac722025d/modules/analyse/src/main/Advice.scala#L52
@@ -165,13 +169,16 @@ def count_errors(cps: List[float]) -> Dict[str, Dict[str, int]]:
     Mistake: 0.2 change in winpercent
     Inaccuracy: 0.1 change in winpercent
     """
+
+    if len(cps) <= 1:
+        raise Exception("Not enough moves to count errors")
+
     errors = {"white": {"blunder": 0, "mistake": 0, "inaccuracy": 0}, "black": {"blunder": 0, "mistake": 0, "inaccuracy": 0}}
 
     # Convert centipawns to win percentages (assuming we have this function)
     # all_win_percents = [centipawn_to_winchance(INITIAL_CP)] + [centipawn_to_winchance(cp) for cp in cps]
-    all_cps = [INITIAL_CP] + cps
 
-    for i, (prev_cp, next_cp) in enumerate(zip(all_cps[:-1], all_cps[1:])):
+    for i, (prev_cp, next_cp) in enumerate(zip(cps[:-1], cps[1:])):
         prev_wc = centipawn_to_winchance(prev_cp)
         next_wc = centipawn_to_winchance(next_cp)
         color = "white" if i % 2 == 0 else "black"
@@ -181,29 +188,44 @@ def count_errors(cps: List[float]) -> Dict[str, Dict[str, int]]:
         
         if diff > 0.3:
             errors[color]["blunder"] += 1
-            # print(f"Blunder: {prev_cp} -> {next_cp} by {color}")
+            print(f"Blunder: {prev_cp} -> {next_cp} by {color}")
         elif diff > 0.2:
             errors[color]["mistake"] += 1
-            # print(f"Mistake: {prev_cp} -> {next_cp} by {color}")
+            print(f"Mistake: {prev_cp} -> {next_cp} by {color}")
         elif diff > 0.1:
             errors[color]["inaccuracy"] += 1
-            # print(f"Inaccuracy: {prev_cp} -> {next_cp} by {color}")
+            print(f"Inaccuracy: {prev_cp} -> {next_cp} by {color}")
 
     return errors
 
 
 def extract_cps(game: chess.pgn.Game) -> List[float]:
-    cps = []
-    root = copy.deepcopy(game)
-    result = game.headers["Result"]
-    while not game.is_end():
-        game = game.next()
+    # assumes that game has at least one move
+    cps = [INITIAL_CP]
+    
+    game = game.next() # skip the initial board (it is INITIAL_CP)
 
-        score = game.eval().white().score()
-        if score is None:
-            assert game.eval().is_mate(), f"WTF: Game {game.headers['GameId']} is not a mate"
-            score = CEILING if result == "1-0" else -CEILING        
+    assert game is not None, f"WTF: Game {game.headers['GameId']} has no moves"
+
+    while True:
+
+        eval = game.eval().white()
+        if isinstance(eval, chess.engine.Cp):
+            score = clip(eval.score(), -CEILING, CEILING)
+
+        elif isinstance(eval, chess.engine.Mate):
+            score = CEILING if eval.mate() > 0 else -CEILING
+        else:
+            raise ValueError(f"Unknown eval type: {type(eval)}")
+        
+        assert score is not None, f"WTF: Game {game.headers['GameId']} has no score"
         cps.append(score)
+
+        if game.is_end():
+            break
+
+        game = game.next()
+    
 
     return cps
 
@@ -491,6 +513,10 @@ def process_all_pgn_files(pgn_dir: str, db_path: str = "chess_metrics.db"):
     """
     Process all PGN files in the specified directories and store metrics in database
     """
+    if os.path.exists(db_path):
+        print(f"Database {db_path} already exists!")
+        return
+    
     conn = create_database(db_path)
     
     # Find all evaluated PGN files
@@ -622,33 +648,35 @@ def print_database_stats(db_path: str = "chess_metrics.db"):
 
 
 def main(args):
-    if args.create_db:
-        # Process all PGN files and create database
-        process_all_pgn_files(args.pgn_dir, args.db_path)
-        print_database_stats(args.db_path)
     
-    elif args.stats:
-        # Print database statistics
+    if args.stats:
         print_database_stats(args.db_path)
-
+        return
     
-    else:
-        print("Please specify --create-db, --stats, or --single-file option")
-        print("Use --help for more information")
+    process_all_pgn_files(args.pgn_dir, args.db_path)
+    print_database_stats(args.db_path)
 
 
 if __name__ == "__main__":
-    with open("sample/new2.pgn", "r") as f:
-        game = chess.pgn.read_game(f)
-        cps = extract_cps(game)
-        print(cps)
+    for i in range(7, 8):
+        with open(f"tests/sample_pgns/g{i}.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            cps = extract_cps(game)
+            w_acpl, b_acpl = get_acpl(cps)
+            print("w_acpl: ", w_acpl, "b_acpl: ", b_acpl)
+            print("game_accuracy: ", game_accuracy(cps))
+            from pprint import pprint
+            pprint(count_errors(cps))
+            print("-"*100)
 
 # if __name__ == "__main__":
 #     arg_parser = argparse.ArgumentParser(description="Analyse PGN files and store metrics in database")
 #     arg_parser.add_argument("-p", "--pgn_dir", type=str, default="temp_db", help="Primary directory to process PGN files")
 #     arg_parser.add_argument("--db-path", type=str, default="chess_metrics.db", help="Path to SQLite database file")
-#     arg_parser.add_argument("-c", "--create-db", action="store_true", help="Create database from all PGN files")
 #     arg_parser.add_argument("-s", "--stats", action="store_true", help="Print database statistics")
     
 #     args = arg_parser.parse_args()
 #     main(args)
+
+# TODO: error sayılarını kaynaktan tekrar kontrol et
+# TODO: mateadvice ile erorr hesabını yap
