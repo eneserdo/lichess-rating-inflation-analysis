@@ -13,7 +13,7 @@ from natsort import natsorted
 import config as cfg
 from utils import PrintInLine, count_games, divide_pgn_file
 
-CHECKPOINT_DIR = Path("temp")
+CHECKPOINT_DIR = Path("eval-checkpoints")
 CHECKPOINT_DIR.mkdir(exist_ok=True)
 
 

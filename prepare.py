@@ -232,6 +232,8 @@ def main(args):
     NUM_PROCESSES = args.num_processes
     NUM_THREADS = args.num_threads
 
+    os.makedirs(args.pgn_dir, exist_ok=True)
+
     PrintInLine.reset()
     PrintInLine.print(1, "Concurently downloading and filtering games...")
     dates = []

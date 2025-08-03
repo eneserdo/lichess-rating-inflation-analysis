@@ -10,12 +10,12 @@ MAX_GAMES_PER_PLAYER = 5 # limit the number of games per player per month
 TOTAL_NUM_GAMES = NUM_GAMES_PER_CONFIG * len(TIME_CONTROL.keys()) * len(RATING_BIN_MEANS)
 
 EVERY_N_MONTHS = 6
-DATES = [f"{year}-{month:02d}" for year in range(2017, 2025) for month in range(1, 13, EVERY_N_MONTHS)]
+DATES = [f"{year}-{month:02d}" for year in range(2017, 2026) for month in range(1, 13, EVERY_N_MONTHS)]
 
 # Variables related to the evaluate.py
 STOCKFISH_PATH = "./stockfish/stockfish-ubuntu-x86-64-avx2"
-STOCKFISH_LIMIT_DEPTH = None # depth (aka ply)
-STOCKFISH_LIMIT_TIME = 5 # seconds
+STOCKFISH_LIMIT_DEPTH = None # depth (aka ply) per move
+STOCKFISH_LIMIT_TIME = 3 # seconds per move
 STOCKFISH_HASH_SIZE = None # None means use the default hash size
 STOCKFISH_THREADS = 2 # None means use the default threads
 
