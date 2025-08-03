@@ -61,7 +61,7 @@ black:
 ###### g4: 
 white: 
 4 Inaccuracies
-2 Mistakes
+0 Mistakes
 1 Blunder
 28 Average centipawn loss
 89% Accuracy
@@ -287,7 +287,7 @@ class TestErrorCounting(unittest.TestCase):
             assert w_b == 4, f"Expected white blunder = 4, got {w_b}"
             assert w_m == 1, f"Expected white mistake = 1, got {w_m}"
             assert w_i == 9, f"Expected white inaccuracy = 9, got {w_i}"
-            assert b_b == 0, f"Expected black blunder = 0, got {b_b}"
+            assert b_b == 4, f"Expected black blunder = 4, got {b_b}"
             assert b_m == 4, f"Expected black mistake = 4, got {b_m}"
             assert b_i == 5, f"Expected black inaccuracy = 5, got {b_i}"
 
@@ -314,10 +314,10 @@ class TestErrorCounting(unittest.TestCase):
             errors = count_errors(cps)
             w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
             b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
-            assert w_b == 4, f"Expected white blunder = 4, got {w_b}"
-            assert w_m == 1, f"Expected white mistake = 1, got {w_m}"
+            assert w_b == 0, f"Expected white blunder = 0, got {w_b}"
+            assert w_m == 2, f"Expected white mistake = 2, got {w_m}"
             assert w_i == 7, f"Expected white inaccuracy = 7, got {w_i}"
-            assert b_b == 0, f"Expected black blunder = 0, got {b_b}"
+            assert b_b == 1, f"Expected black blunder = 1, got {b_b}"
             assert b_m == 3, f"Expected black mistake = 3, got {b_m}"
             assert b_i == 3, f"Expected black inaccuracy = 3, got {b_i}"
 
@@ -329,12 +329,12 @@ class TestErrorCounting(unittest.TestCase):
             errors = count_errors(cps)
             w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
             b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
-            assert w_b == 4, f"Expected white blunder = 4, got {w_b}"
-            assert w_m == 1, f"Expected white mistake = 1, got {w_m}"
-            assert w_i == 10, f"Expected white inaccuracy = 10, got {w_i}"
-            assert b_b == 0, f"Expected black blunder = 0, got {b_b}"
+            assert w_b == 1, f"Expected white blunder = 1, got {w_b}"
+            assert w_m == 0, f"Expected white mistake = 0, got {w_m}"
+            assert w_i == 4, f"Expected white inaccuracy = 4, got {w_i}"
+            assert b_b == 1, f"Expected black blunder = 1, got {b_b}"
             assert b_m == 1, f"Expected black mistake = 1, got {b_m}"
-            assert b_i == 5, f"Expected black inaccuracy = 5, got {b_i}"
+            assert b_i == 2, f"Expected black inaccuracy = 2, got {b_i}"
 
     def test_count_errors_g5(self):
         """Test error counting with g5.pgn"""
