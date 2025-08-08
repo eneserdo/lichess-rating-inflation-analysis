@@ -14,10 +14,10 @@ DATES = [f"{year}-{month:02d}" for year in range(2017, 2026) for month in range(
 
 # Variables related to the evaluate.py
 STOCKFISH_PATH = "./stockfish/stockfish-ubuntu-x86-64-avx2"
-STOCKFISH_LIMIT_DEPTH = None # depth (aka ply) per move
-STOCKFISH_LIMIT_TIME = 3 # seconds per move
+STOCKFISH_LIMIT_DEPTH = 23 # depth (aka ply) per move
+STOCKFISH_LIMIT_TIME = None # seconds per move
 STOCKFISH_HASH_SIZE = None # None means use the default hash size
-STOCKFISH_THREADS = 2 # None means use the default threads
+STOCKFISH_THREADS = 3 # None means use the default threads
 
 # Variables related to the single_run.py
 PLAYERS = [
