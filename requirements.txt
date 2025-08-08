@@ -4,3 +4,4 @@ chess
 matplotlib
 numpy
 seaborn
+natsort
