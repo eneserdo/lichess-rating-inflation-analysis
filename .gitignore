@@ -11,3 +11,6 @@ __pycache__/
 *.tmp
 temp/
 chess_metrics.db
+.venv/
+eval-checkpoints/
+.pytest_cache/
