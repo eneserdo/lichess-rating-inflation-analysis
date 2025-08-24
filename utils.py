@@ -209,7 +209,9 @@ def eval_benchmark(game: chess.pgn.Game, hash_size: int = None, num_threads: int
             analyse = engine.analyse(
                 game.board(), chess.engine.Limit(depth=depth_limit, time=time_limit)
             )
-            game.set_eval(analyse["score"])
+            pass
+
+            # game.set_eval(analyse["score"])
 
 
 def eval_benchmark_v2(game1: chess.pgn.Game, game2: chess.pgn.Game, hash_size: int = None, num_threads: int = None, depth_limit: int = None, time_limit: int = None):
@@ -257,28 +259,14 @@ if __name__ == "__main__":
     # counter=count_games2("lichess_db/lichess_db_standard_rated_2015-01_filtered.pgn")
 
 
-    configs = [
-        {"depth_limit": 18, "hash_size": 16, "num_threads": 1},
-        {"depth_limit": 18, "hash_size": 16, "num_threads": 2},
-        {"depth_limit": 18, "hash_size": 16, "num_threads": 3},
-        {"depth_limit": 18, "hash_size": 16, "num_threads": 4},
-        {"depth_limit": 18, "hash_size": 16, "num_threads": 5},
-    ]
 
-    for config in configs:
-        n_runs = 5
-        times = []
         
-        for run in range(n_runs):
-            with open("sample/new2.pgn") as f:
-                game = chess.pgn.read_game(f)
-            start = time.perf_counter()
-            game = eval_benchmark(game, **config)
-            end = time.perf_counter()
-            times.append(end - start)
-        
-        avg_time = sum(times) / len(times)
-        print(f"Average elapsed: {avg_time:.4f} s over {n_runs} runs for {config}")
+    with open("sample/not_evaluated.pgn") as f:
+        game = chess.pgn.read_game(f)
+    start = time.perf_counter()
+    game = eval_benchmark(game, depth_limit=15)
+    end = time.perf_counter()
+    print(f"Time taken: {end - start:.4f} s")
 
     # for hash_size in [32, 512, 1024, 2048]:
     #     times_g1 = []

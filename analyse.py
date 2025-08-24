@@ -182,7 +182,7 @@ def detect_mate_sequence(prev_mate: Optional[int], curr_mate: Optional[int]) -> 
     return None
 
 
-# Based on https://github.com/lichess-org/lila/blob/cf9e10df24b767b3bc5ee3d88c45437ac722025d/modules/analyse/src/main/Advice.scala
+# Based on https://github.com/lichess-org/lila/blob/master/modules/tree/src/main/Advice.scala
 def count_errors(evals: List[Eval], verbose: bool = False) -> Dict[str, Dict[str, int]]:
     """
     Count the number of blunders, mistakes, and inaccuracies in the game
@@ -238,10 +238,6 @@ def count_errors(evals: List[Eval], verbose: bool = False) -> Dict[str, Dict[str
                 next_mate = -next_mate if next_mate is not None else None
             
             sequence = detect_mate_sequence(prev_mate, next_mate)
-
-            if sequence is None:
-                raise ValueError("WTF: None sequence")
-                # continue
 
             prev_cp_val = prev_cp if prev_cp is not None else 0
             next_cp_val = next_cp if next_cp is not None else 0
@@ -315,7 +311,11 @@ def extract_evals(game: chess.pgn.Game) -> List[Eval]:
 
     assert game is not None, f"WTF: Game {game.headers['GameId']} has no moves"
 
+    counter = 0
     while True:
+        if len(game.variations) > 1:
+            counter += 1
+
         eval = game.eval().white()
         evals.append(eval)
 
@@ -325,7 +325,7 @@ def extract_evals(game: chess.pgn.Game) -> List[Eval]:
 
         game = game.next()
     
-
+    print(f"Counter: {counter}")
     return evals
 
 def evals_to_cps(evals: List[Eval]) -> List[float]:
@@ -755,7 +755,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    for i in range(5, 6):
+    for i in range(7, 8):
         with open(f"tests/sample_pgns/g{i}.pgn", "r") as f:
             game = chess.pgn.read_game(f)
             evals = extract_evals(game)

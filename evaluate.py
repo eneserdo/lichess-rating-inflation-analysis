@@ -100,11 +100,19 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
         
         while not game.is_end():
             game = game.next()
-            analyse = engine.analyse(
-                game.board(), chess.engine.Limit(depth=cfg.STOCKFISH_LIMIT_DEPTH, time=cfg.STOCKFISH_LIMIT_TIME)
-            )
-            # print(analyse["score"])
-            game.set_eval(analyse["score"])
+            info = engine.analyse(
+                game.board(), chess.engine.Limit(depth=cfg.STOCKFISH_LIMIT_DEPTH, time=cfg.STOCKFISH_LIMIT_TIME))
+
+            game.set_eval(info["score"])
+
+            # We will only calculate errors if the move is different from the principal variation
+            # This is what Lichess does: 
+            # - https://github.com/lichess-org/lila/blob/a372b7fe49ccaddfe31a97fff8d2a298f0debd89/modules/tree/src/main/Analysis.scala#L32C63-L32C69
+            # - https://github.com/lichess-org/lila/blob/a372b7fe49ccaddfe31a97fff8d2a298f0debd89/modules/fishnet/src/main/AnalysisBuilder.scala#L74 
+
+            if game.next():
+                if game.next().move != info["pv"][0]:
+                    game.comment += " [HAS_VARIATION]"
 
     return root
 
@@ -216,9 +224,15 @@ def main(args):
         PrintInLine.print(3+args.num_processes+1, f"{fnames} is done. Elapsed time: {elapsed_hours:.2f} h, {elapsed_hours / game_count:.2f} hours/game")
 
 
+# if __name__ == "__main__":
+#     arg_parser = argparse.ArgumentParser(description="Evaluate pgn files with Stockfish")
+#     arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Directory to process pgn files")
+#     arg_parser.add_argument("-np", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
+#     args = arg_parser.parse_args()
+#     main(args)
+
 if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser(description="Evaluate pgn files with Stockfish")
-    arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Directory to process pgn files")
-    arg_parser.add_argument("-np", "--num_processes", type=int, default=8, help="Number of processes to use for filtering (default 8)")
-    args = arg_parser.parse_args()
-    main(args)
+    with open("sample/not_evaluated.pgn", "r") as f:
+        game = chess.pgn.read_game(f)
+        eval_game(game)
+        print(game.eval())

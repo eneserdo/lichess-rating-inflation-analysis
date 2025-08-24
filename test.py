@@ -1,256 +1,169 @@
-import mmap
-import os
-import re
-import sys
-import time
+import math
+from typing import Dict, List, Optional, Union
 
-import chess
 import chess.pgn
+from chess.engine import Cp, Mate
+
+from analyse import extract_evals
+
+Eval = Union[Cp, Mate]
+
+def clip(value: float, min_val: float, max_val: float) -> float:
+    return min(max(value, min_val), max_val)
+
+def centipawn_to_winchance(cp: int) -> float:
+    MULTIPLIER = -0.00368208
+    value = 2.0 / (1.0 + math.exp(MULTIPLIER * float(cp))) - 1.0
+    return clip(value, -1.0, 1.0)
 
 
-def filter_by_pgn(file_path, filter_func):
-    count = 0
-    total = 0
-    with open(file_path, "r") as file:
-        while True:
-            pgn_header = chess.pgn.read_headers(file)
-            if not pgn_header:
-                break
-            if filter_func(pgn_header):
-                count += 1
-            total += 1
 
-    return count, total
-
-
-def filter_naive(file_path, filter_func, binary=False, buffer_size=-1):
-    count = 0
-    total = 0
-    file_size = os.path.getsize(file_path)
-
-    with open(file_path, "r" if not binary else "rb", buffering=buffer_size) as file:
-        game_lines = [file.readline()]
-
-        while file.tell() < file_size: 
-            line = file.readline()
-            if not line.startswith("[Event"):
-                game_lines.append(line)
-            else:
-                # new game starts
-                if filter_func(game_lines):
-                    count += 1
-                game_lines = [line]
-                total += 1
-
-    return count, total
-
-
-def divide_pgn_file(file_path, num_partitions):
+def count_errors(evals: List[Eval], verbose: bool = False) -> Dict[str, Dict[str, int]]:
     """
-    Divide the file into approximately equal parts. It complies with the requirements of mmap (offset must be multiple of ALLOCATIONGRANULARITY, length can be anything).
-    # TODO: Is it possible to have a game > ALLOCATIONGRANULARITY ?
+    Count blunders, mistakes, and inaccuracies for White and Black.
+
+    The logic follows Lichess advice rules:
+    - CP advice: use changes in winning chances derived from centipawns with
+      thresholds 0.3 (blunder), 0.2 (mistake), 0.1 (inaccuracy). The delta is
+      measured from White's winning-chance perspective and flipped for the mover
+      so that positive values indicate the mover made the position worse.
+    - Mate advice: detect transitions creating a forced mate for the opponent
+      or losing one's own forced mate. The severity depends on the position
+      evaluation (in centipawns) relative to the mover's POV:
+        MateCreated: prev Cp, next Mate against the mover
+          prev_pov_cp < -999: Inaccuracy
+          prev_pov_cp < -700: Mistake
+          else: Blunder
+        MateLost: prev Mate for mover, next Cp or Mate for opponent
+          curr_pov_cp > 999: Inaccuracy
+          curr_pov_cp > 700: Mistake
+          else: Blunder
+
+    Assumptions:
+    - `evals[i]` is the engine evaluation after the i-th ply, starting with
+      White having just moved at index 0. Therefore, the mover for the pair
+      (evals[i-1] -> evals[i]) is White if i is even, else Black.
     """
-    file_size = os.path.getsize(file_path)
-    page_size = mmap.ALLOCATIONGRANULARITY
 
-    assert file_size >= page_size, f"File is smaller than the page size: {file_size:_} < {page_size:_}"
-
-
-    chunk_size = file_size // num_partitions
-    boundaries = [i * chunk_size for i in range(num_partitions)]
-    boundaries.append(file_size)  # Ensure the last chunk covers the end
-
-    # align starts to the page size
-    boundary_pairs = []
-    for i in range(1, len(boundaries)):
-        start = boundaries[i-1]
-        aligned_start = (start + page_size - 1) // page_size * page_size
-        end = boundaries[i]
-        boundary_pairs.append([aligned_start, end])
-
-    del boundaries
-
-    # shift the ends to cover all the games
-    with open(file_path) as pgn_db:
-        for idx, (start, end) in enumerate(boundary_pairs[:-1]):
-            # Align start to page boundary
-
-            pgn_db.seek(end)
-            line = pgn_db.readline()
-            while not line.startswith("[Event"):
-                line = pgn_db.readline()
-            boundary_pairs[idx][1] = pgn_db.tell() - len(line)
-
-    # Basically, ends respect the game boundaries, but starts are aligned to the page size
-    # When using mmap, at the beginning of the file, consume the first partial game
-    return boundary_pairs
-
-def consume_first_game(mmap_file):
-    line = mmap_file.readline()
-    while not line.startswith(b"[Event"):
-        # print("c", end="", flush=True)
-        line = mmap_file.readline()
-    # print()
-    mmap_file.seek(mmap_file.tell() - len(line))
-
-    
-
-def filter_mmap(file_path, filter_func, num_steps=1):
-    count = 0
-    total = 0
-    file_size = os.path.getsize(file_path)
-    
-    if num_steps == 1:
-        boundaries = [[0, file_size]]
-    else:
-        boundaries = divide_pgn_file(file_path, num_steps)
-
-    with open(file_path, "r") as file:  # Open in binary mode with write access
-        for start, end in boundaries:
-            # print(f"Processing chunk {start} - {end}")
-            
-            with mmap.mmap(file.fileno(), length=end - start, access=mmap.ACCESS_READ, offset=start) as mmap_file:
-                # consume the first partial game
-                consume_first_game(mmap_file)
-
-                # read the rest of the games
-                game_lines = [mmap_file.readline()]
-                
-                while mmap_file.tell() < end-start:
-                    line = mmap_file.readline()
-                        
-                    if not line.startswith(b"[Event"):
-                        game_lines.append(line)
-                    else:
-                        # new game starts
-                        if filter_func(game_lines):
-                            count += 1
-                        game_lines = [line]
-                        total += 1
-                    
-                # Process the last game in the chunk
-                if game_lines and filter_func(game_lines):
-                    count += 1
-                    total += 1
-
-    return count, total
-
-
-def measure_time(func, *args, **kwargs):
-    start = time.perf_counter()
-    result = func(*args, **kwargs)
-    end = time.perf_counter()
-    return end - start, result
-
-
-
-# def filter_string(content_lines):
-#     white_elo = None
-#     black_elo = None
-#     for line in content_lines:
-#         if line.startswith("[WhiteElo "):
-#             if "?" in line:
-#                 return False
-#             # regex to extract the elo
-#             white_elo = int(line.split(" ")[1].strip().strip("]").strip("\""))
-#         elif line.startswith("[BlackElo "):
-#             if "?" in line:
-#                 return False
-#             black_elo = int(line.split(" ")[1].strip().strip("]").strip("\""))
-        
-#         if white_elo is not None and black_elo is not None:
-#             break
-
-#     if white_elo is None or black_elo is None:
-#         raise ValueError("No white or black elo found")
-    
-#     return abs(white_elo - black_elo) < 50
-
-# def filter_byte(content_lines):
-#     white_elo = None
-#     black_elo = None
-#     for line in content_lines:
-#         if line.startswith(b"[WhiteElo "):
-#             if b"?" in line:
-#                 return False
-#             # regex to extract the elo
-#             white_elo = int(line.split(b" ")[1].strip().strip(b"]").strip(b"\""))
-#         elif line.startswith(b"[BlackElo "):
-#             if b"?" in line:
-#                 return False
-#             black_elo = int(line.split(b" ")[1].strip().strip(b"]").strip(b"\""))
-        
-#         if white_elo is not None and black_elo is not None:
-#             break
-
-#     if white_elo is None or black_elo is None:
-#         raise ValueError("No white or black elo found")
-    
-#     return abs(white_elo - black_elo) < 50
-
-
-def is_game_valid(game_headers: dict) -> bool:
-    """
-    Discard:
-    - casual games
-    - players with high rating deviation
-    - anonymous players
-    - games with high rating difference
-    """
-    return (
-        ("rated" in game_headers.get("Event").lower())
-        and ("?" not in game_headers.get("White")) 
-        and ("?" not in game_headers.get("Black"))
-        and ("WhiteRatingDiff" in game_headers)
-        and ("BlackRatingDiff" in game_headers)
-        and (int(game_headers.get("WhiteRatingDiff").replace("+", "").replace("-", "")) < 15) 
-        and (int(game_headers.get("BlackRatingDiff").replace("+", "").replace("-", "")) < 15) 
-        and (abs(int(game_headers.get("WhiteElo")) - int(game_headers.get("BlackElo"))) < 50) 
-        and ("TimeControl" in game_headers)
+    assert isinstance(evals, list) and all(isinstance(e, (Cp, Mate)) for e in evals), (
+        "Evals must be a list of chess.engine.Cp or chess.engine.Mate"
     )
+    if len(evals) <= 1:
+        raise Exception("Not enough moves to count errors")
 
-def filter_byte(content_lines):
-    header = {}
-    for line in content_lines:
-        if not line.startswith(b"["):
+    errors: Dict[str, Dict[str, int]] = {
+        "white": {"blunder": 0, "mistake": 0, "inaccuracy": 0},
+        "black": {"blunder": 0, "mistake": 0, "inaccuracy": 0},
+    }
+
+    def get_cp(eval_obj: Eval) -> Optional[int]:
+        return int(eval_obj.score()) if isinstance(eval_obj, Cp) else None
+
+    def get_mate(eval_obj: Eval) -> Optional[int]:
+        return int(eval_obj.mate()) if isinstance(eval_obj, Mate) else None
+
+    for i in range(1, len(evals)):
+        prev_eval = evals[i - 1]
+        curr_eval = evals[i]
+
+        mover = "white" if (i % 2 == 1) else "black"
+
+        prev_cp = get_cp(prev_eval)
+        curr_cp = get_cp(curr_eval)
+
+        # CP advice when both evaluations are centipawn scores
+        if prev_cp is not None and curr_cp is not None:
+            prev_wc = centipawn_to_winchance(prev_cp)
+            curr_wc = centipawn_to_winchance(curr_cp)
+            delta = curr_wc - prev_wc
+            # Flip for White so that positive means "worse for mover"
+            badness = -delta if mover == "white" else delta
+
+            if badness >= 0.3:
+                errors[mover]["blunder"] += 1
+                if verbose:
+                    print(f"Ply {i}: {mover} blunder (Δ={badness:.3f})")
+            elif badness >= 0.2:
+                errors[mover]["mistake"] += 1
+                if verbose:
+                    print(f"Ply {i}: {mover} mistake (Δ={badness:.3f})")
+            elif badness >= 0.1:
+                errors[mover]["inaccuracy"] += 1
+                if verbose:
+                    print(f"Ply {i}: {mover} inaccuracy (Δ={badness:.3f})")
             continue
-        key, value = line.split(b" ", 1)
-        key = key.strip(b"[").decode()
-        value = value.strip().strip(b"]").strip(b"\"").decode()
-        header[key] = value
-    
-    return is_game_valid(header)
-    
-    
 
-def temp():
-    # create a dummy txt file with 1000 lines
-    with open("dummy.txt", "w") as f:
-        for i in range(1000):
-            f.write(f"line {i}\n")
+        # Mate advice
+        prev_mate = get_mate(prev_eval)
+        curr_mate = get_mate(curr_eval)
 
-    # read with mmap
-    with open("dummy.txt", "r+b") as f:
-        mmap_file = mmap.mmap(f.fileno(), length=100, access=mmap.ACCESS_READ, offset=4*1024)
-        print(mmap_file.read())
+        # Helper: centipawn value from mover's POV (positive is good for mover)
+        def pov_cp(value: Optional[int]) -> int:
+            if value is None:
+                return 0
+            return value if mover == "white" else -value
+
+        # Helper: mate sign from mover's POV (positive is mate for mover)
+        def pov_mate(value: Optional[int]) -> Optional[int]:
+            if value is None:
+                return None
+            return value if mover == "white" else -value
+
+        # MateCreated: prev Cp, next Mate against mover
+        if prev_cp is not None and curr_mate is not None:
+            curr_pov_mate = pov_mate(curr_mate)
+            assert curr_pov_mate is not None
+            if curr_pov_mate < 0:
+                prev_pov_cp = pov_cp(prev_cp)
+                if prev_pov_cp < -999:
+                    errors[mover]["inaccuracy"] += 1
+                    if verbose:
+                        print(f"Ply {i}: {mover} inaccuracy (mate created; prev={prev_pov_cp})")
+                elif prev_pov_cp < -700:
+                    errors[mover]["mistake"] += 1
+                    if verbose:
+                        print(f"Ply {i}: {mover} mistake (mate created; prev={prev_pov_cp})")
+                else:
+                    errors[mover]["blunder"] += 1
+                    if verbose:
+                        print(f"Ply {i}: {mover} blunder (mate created; prev={prev_pov_cp})")
+            continue
+
+        # MateLost: prev Mate for mover, next Cp or Mate for opponent
+        if prev_mate is not None and pov_mate(prev_mate) is not None and pov_mate(prev_mate) > 0:
+            judgement_recorded = False
+            if curr_cp is not None:
+                curr_pov_cp = pov_cp(curr_cp)
+                if curr_pov_cp > 999:
+                    errors[mover]["inaccuracy"] += 1
+                elif curr_pov_cp > 700:
+                    errors[mover]["mistake"] += 1
+                else:
+                    errors[mover]["blunder"] += 1
+                judgement_recorded = True
+                if verbose:
+                    print(f"Ply {i}: {mover} {'inaccuracy' if curr_pov_cp > 999 else 'mistake' if curr_pov_cp > 700 else 'blunder'} (mate lost; curr={curr_pov_cp})")
+            else:
+                curr_pov_mate = pov_mate(curr_mate)
+                if curr_pov_mate is not None and curr_pov_mate < 0:
+                    # No CP available; treat as 0 for judgement thresholds
+                    errors[mover]["blunder"] += 1
+                    judgement_recorded = True
+                    if verbose:
+                        print(f"Ply {i}: {mover} blunder (mate lost; now mated)")
+
+            if judgement_recorded:
+                continue
+
+        # Other mate-to-mate transitions (e.g., delaying mate) are ignored per reference
+
+    return errors
 
 
 if __name__ == "__main__":
-    fname = "dummy_db/dummy.pgn"
-    fsize = os.path.getsize(fname)
-    print(f"file size: {fsize:_}\n")
-
-    elapsed, result = measure_time(filter_by_pgn, fname, is_game_valid)
-    print(f"filter_by_pgn: {round(elapsed, 5)}s, {result}")
-
-    # elapsed, result = measure_time(filter_naive, fname, filter_string, binary=False)
-    # print(f"filter_naive: {round(elapsed, 5)}s, {result}")
-
-    elapsed, result = measure_time(filter_mmap, fname, filter_byte)
-    print(f"filter_mmap: {round(elapsed, 5)}s, {result}")
-
-    elapsed, result = measure_time(filter_mmap, fname, filter_byte, num_steps=5)
-    print(f"filter_mmap 1/5: {round(elapsed, 5)}s, {result}")
-
-    elapsed, result = measure_time(filter_mmap, fname, filter_byte, num_steps=10)
-    print(f"filter_mmap 1/10: {round(elapsed, 5)}s, {result}")
+    # Example usage
+    with open("tests/sample_pgns/g7.pgn", "r") as f:
+        game = chess.pgn.read_game(f)
+        evals = extract_evals(game)
+    result = count_errors(evals, verbose=True)
+    print(result)
