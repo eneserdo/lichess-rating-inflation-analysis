@@ -155,7 +155,7 @@ def extract_games(game_info_path: str, pgn_path: str):
 
             white, black, white_elo, black_elo, result, time_control, offset = line.strip().split(" ")
             
-            if counter["players"][white] >= cfg.MAX_GAMES_PER_PLAYER or counter["players"][black] >= cfg.MAX_GAMES_PER_PLAYER:
+            if counter["players"][white] >= cfg.MAX_GAMES_PER_PLAYER_PER_MONTH or counter["players"][black] >= cfg.MAX_GAMES_PER_PLAYER_PER_MONTH:
                 continue
             
             tempo = get_time_control(time_control)
@@ -173,7 +173,7 @@ def extract_games(game_info_path: str, pgn_path: str):
                 counter["players"][white] += 1
                 counter["players"][black] += 1
             
-            if counter["total"] >= cfg.TOTAL_NUM_GAMES:
+            if counter["total"] >= cfg.TOTAL_NUM_GAMES_PER_MONTH:
                 break
     
     end_time = time.perf_counter()
