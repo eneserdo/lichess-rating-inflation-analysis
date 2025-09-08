@@ -183,7 +183,7 @@ def detect_mate_sequence(prev_mate: Optional[int], curr_mate: Optional[int]) -> 
 
 
 # Based on https://github.com/lichess-org/lila/blob/master/modules/tree/src/main/Advice.scala
-def count_errors(evals: List[Eval], verbose: bool = False) -> Dict[str, Dict[str, int]]:
+def count_errors(evals: List[Eval], has_variation: List[bool], verbose: bool = False) -> Dict[str, Dict[str, int]]:
     """
     Count the number of blunders, mistakes, and inaccuracies in the game
     Blunder: 0.3 change in winpercent
@@ -201,6 +201,13 @@ def count_errors(evals: List[Eval], verbose: bool = False) -> Dict[str, Dict[str
 
     for i, (prev_eval, next_eval) in enumerate(zip(evals[:-1], evals[1:])):
         color = "white" if i % 2 == 0 else "black"
+        hv = has_variation[i]
+        # only if hv is True, we count the error, otherwise we ignore it
+        # Just like Lichess does
+        if not hv:
+            if verbose: 
+                print(f"Skipping i={i} because it has no variation")
+            continue
         
         if isinstance(prev_eval, Cp) and isinstance(next_eval, Cp):
             prev_cp, next_cp = prev_eval.score(), next_eval.score()
@@ -213,15 +220,15 @@ def count_errors(evals: List[Eval], verbose: bool = False) -> Dict[str, Dict[str
             if diff > 0.3:
                 errors[color]["blunder"] += 1
                 if verbose:
-                    print(f"[CP] Blunder: {prev_cp} -> {next_cp} by {color} at {i // 2 + 1}")
+                    print(f"[CP] Blunder: {prev_cp} -> {next_cp} by {color} at {i // 2 + 1}, (i={i})")
             elif diff > 0.2:
                 errors[color]["mistake"] += 1
                 if verbose:
-                    print(f"[CP] Mistake: {prev_cp} -> {next_cp} by {color} at {i // 2 + 1}")
+                    print(f"[CP] Mistake: {prev_cp} -> {next_cp} by {color} at {i // 2 + 1}, (i={i})")
             elif diff > 0.1:
                 errors[color]["inaccuracy"] += 1
                 if verbose:
-                    print(f"[CP] Inaccuracy: {prev_cp} -> {next_cp} by {color} at {i // 2 + 1}")
+                    print(f"[CP] Inaccuracy: {prev_cp} -> {next_cp} by {color} at {i // 2 + 1}, (i={i})")
         
         else:
             # one of the evals is a mate
@@ -246,29 +253,29 @@ def count_errors(evals: List[Eval], verbose: bool = False) -> Dict[str, Dict[str
                 if prev_cp_val < -999:
                     errors[color]["inaccuracy"] += 1
                     if verbose:
-                        print(f"[MA] Inaccuracy: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, sequence: {sequence}")
+                        print(f"[MA] Inaccuracy: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, (i={i}), sequence: {sequence}")
                 elif prev_cp_val < -700:
                     errors[color]["mistake"] += 1
                     if verbose:
-                        print(f"[MA] Mistake: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, sequence: {sequence}")
+                        print(f"[MA] Mistake: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, (i={i}), sequence: {sequence}")
                 else:
                     errors[color]["blunder"] += 1
                     if verbose:
-                        print(f"[MA] Blunder: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, sequence: {sequence}")
+                        print(f"[MA] Blunder: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, (i={i}), sequence: {sequence}")
 
             elif sequence == "MateLost":
                 if next_cp_val > 999:
                     errors[color]["inaccuracy"] += 1
                     if verbose:
-                        print(f"[MA] Inaccuracy: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, sequence: {sequence}")
+                        print(f"[MA] Inaccuracy: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, (i={i}), sequence: {sequence}")
                 elif next_cp_val > 700:
                     errors[color]["mistake"] += 1
                     if verbose:
-                        print(f"[MA] Mistake: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, sequence: {sequence}")
+                        print(f"[MA] Mistake: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, (i={i}), sequence: {sequence}")
                 else:
                     errors[color]["blunder"] += 1
                     if verbose:
-                        print(f"[MA] Blunder: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, sequence: {sequence}")
+                        print(f"[MA] Blunder: {prev_cp_val} -> {next_cp_val} by {color} at {i // 2 + 1}, (i={i}), sequence: {sequence}")
 
     return errors
 
@@ -303,30 +310,37 @@ def extract_cps(game: chess.pgn.Game) -> List[float]:
 
     return cps
 
-def extract_evals(game: chess.pgn.Game) -> List[Eval]:
+def extract_evals(game: chess.pgn.Game) -> Tuple[List[Eval], List[bool]]:
     # assumes that game has at least one move
-    evals = [Cp(INITIAL_CP)]
+    evals = [Cp(INITIAL_CP)] # Initial board, so if there is N moves, there will be N+1 evals
+    has_variation = [False] # For each move
     
     game = game.next() # skip the initial board (it is INITIAL_CP)
 
     assert game is not None, f"WTF: Game {game.headers['GameId']} has no moves"
 
-    counter = 0
     while True:
-        if len(game.variations) > 1:
-            counter += 1
+        # Only count errors if the move is different from the principal variation
+
+        if len(game.variations) > 1: # This is how lichess does it, so to pass tests I implemented it like this
+            has_variation.append(True)
+        else:
+            has_variation.append(False)
 
         eval = game.eval().white()
         evals.append(eval)
-
 
         if game.is_end():
             break
 
         game = game.next()
     
-    print(f"Counter: {counter}")
-    return evals
+    has_variation.pop() # Remove the last False
+
+    assert len(evals) == len(has_variation) + 1, f"{len(evals)=} != {len(has_variation)=} + 1"
+    
+    return evals, has_variation
+
 
 def evals_to_cps(evals: List[Eval]) -> List[float]:
     cps = []
@@ -462,12 +476,12 @@ def extract_game_metrics(game: chess.pgn.Game, date: str) -> Optional[Dict]:
     site = game.headers.get('Site')
     game_id = extract_game_id_from_site(site)
 
-    evals = extract_evals(game)
+    evals, has_variation = extract_evals(game)
     
     cps = evals_to_cps(evals)
     w_acpl, b_acpl = get_acpl(cps)
     white_accuracy, black_accuracy = game_accuracy(cps)
-    errors = count_errors(evals)
+    errors = count_errors(evals, has_variation)
     
     return {
         'date': date,
@@ -754,47 +768,25 @@ def main(args):
     print_database_stats(args.db_path)
 
 
-if __name__ == "__main__":
-    for i in range(7, 8):
-        with open(f"tests/sample_pgns/g{i}.pgn", "r") as f:
-            game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
-            cps = evals_to_cps(evals)
-            w_acpl, b_acpl = get_acpl(cps)
-            print("w_acpl: ", w_acpl, "b_acpl: ", b_acpl)
-            print("game_accuracy: ", game_accuracy(cps))
-            from pprint import pprint
-            pprint(count_errors(evals, verbose=True))
-            print("-"*100)
-
-            # game = chess.pgn.read_game(f)
-            # evals = extract_evals(game)
-            # for eval in evals:
-            #     if isinstance(eval, Cp):
-            #         print(f"Cp({eval.score()})", end=", ")
-            #     elif isinstance(eval, Mate):
-            #         print(f"Mate({eval.mate()})", end=", ")
-            #     else:
-            #         raise ValueError(f"Unknown eval type: {type(eval)}")
-            # print()
-
-
-            # cps = evals_to_cps(evals)
-            # w_acpl, b_acpl = get_acpl(cps)
-            # print("w_acpl: ", w_acpl, "b_acpl: ", b_acpl)
-            # print("game_accuracy: ", game_accuracy(cps))
-            # from pprint import pprint
-            # pprint(count_errors(evals))
-            # print("-"*100)
-
 # if __name__ == "__main__":
-#     arg_parser = argparse.ArgumentParser(description="Analyse PGN files and store metrics in database")
-#     arg_parser.add_argument("-p", "--pgn_dir", type=str, default="temp_db", help="Primary directory to process PGN files")
-#     arg_parser.add_argument("--db-path", type=str, default="chess_metrics.db", help="Path to SQLite database file")
-#     arg_parser.add_argument("-s", "--stats", action="store_true", help="Print database statistics")
-    
-#     args = arg_parser.parse_args()
-#     main(args)
+#     # for i in range(6, 8):
+#     if True:
+#         with open("tests/sample_pgns/g5.pgn", "r") as f:
+#             game = chess.pgn.read_game(f)
+#             evals, has_variation = extract_evals(game)
+#             cps = evals_to_cps(evals)
+#             w_acpl, b_acpl = get_acpl(cps)
+#             print("w_acpl: ", w_acpl, "b_acpl: ", b_acpl)
+#             print("game_accuracy: ", game_accuracy(cps))
+#             from pprint import pprint
+#             pprint(count_errors(evals, has_variation, verbose=True))
+#             print("-"*100)
 
-# TODO: error sayılarını kaynaktan tekrar kontrol et
-# TODO: mateadvice ile erorr hesabını yap
+if __name__ == "__main__":
+    arg_parser = argparse.ArgumentParser(description="Analyse PGN files and store metrics in database")
+    arg_parser.add_argument("-p", "--pgn_dir", type=str, default="temp_db", help="Primary directory to process PGN files")
+    arg_parser.add_argument("--db-path", type=str, default="chess_metrics.db", help="Path to SQLite database file")
+    arg_parser.add_argument("-s", "--stats", action="store_true", help="Print database statistics")
+    
+    args = arg_parser.parse_args()
+    main(args)
