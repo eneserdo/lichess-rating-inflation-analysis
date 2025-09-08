@@ -311,8 +311,8 @@ class TestErrorCounting(unittest.TestCase):
         """Test error counting with g1.pgn"""
         with open("tests/sample_pgns/g1.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
-            errors = count_errors(evals)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
             w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
             b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
             assert w_b == 4, f"Expected white blunder = 4, got {w_b}"
@@ -326,8 +326,8 @@ class TestErrorCounting(unittest.TestCase):
         """Test error counting with g2.pgn"""
         with open("tests/sample_pgns/g2.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
-            errors = count_errors(evals)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
             w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
             b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
             assert w_b == 0, f"Expected white blunder = 0, got {w_b}"
@@ -341,8 +341,8 @@ class TestErrorCounting(unittest.TestCase):
         """Test error counting with g3.pgn"""
         with open("tests/sample_pgns/g3.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
-            errors = count_errors(evals)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
             w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
             b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
             assert w_b == 0, f"Expected white blunder = 0, got {w_b}"
@@ -356,8 +356,8 @@ class TestErrorCounting(unittest.TestCase):
         """Test error counting with g4.pgn"""
         with open("tests/sample_pgns/g4.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
-            errors = count_errors(evals)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
             w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
             b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
             assert w_b == 1, f"Expected white blunder = 1, got {w_b}"
@@ -371,8 +371,8 @@ class TestErrorCounting(unittest.TestCase):
         """Test error counting with g5.pgn"""
         with open("tests/sample_pgns/g5.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
-            errors = count_errors(evals)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
             w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
             b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
             assert w_b == 1, f"Expected white blunder = 1, got {w_b}"
@@ -386,8 +386,8 @@ class TestErrorCounting(unittest.TestCase):
         """Test error counting with g6.pgn"""
         with open("tests/sample_pgns/g6.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
-            errors = count_errors(evals)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
             w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
             b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
             assert w_b == 3, f"Expected white blunder = 5, got {w_b}"
@@ -396,6 +396,21 @@ class TestErrorCounting(unittest.TestCase):
             assert b_b == 5, f"Expected black blunder = 5, got {b_b}"
             assert b_m == 0, f"Expected black mistake = 0, got {b_m}"
             assert b_i == 8, f"Expected black inaccuracy = 8, got {b_i}"
+ 
+    def test_count_errors_g7(self):
+        """Test error counting with g7.pgn"""
+        with open("tests/sample_pgns/g7.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
+            w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
+            b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
+            assert w_b == 3, f"Expected white blunder = 3, got {w_b}"
+            assert w_m == 1, f"Expected white mistake = 1, got {w_m}"
+            assert w_i == 4, f"Expected white inaccuracy = 4, got {w_i}"
+            assert b_b == 4, f"Expected black blunder = 4, got {b_b}"
+            assert b_m == 1, f"Expected black mistake = 1, got {b_m}"
+            assert b_i == 5, f"Expected black inaccuracy = 5, got {b_i}"
 
 
 class TestGameAccuracy(unittest.TestCase):
