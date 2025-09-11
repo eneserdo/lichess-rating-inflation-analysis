@@ -12,96 +12,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from analyse import count_errors, evals_to_cps, extract_evals, game_accuracy, get_acpl
 
-"""
-########## Game states from lichess: 
-
-###### g1: 
-white:
-9 Inaccuracies
-1 Mistake
-4 Blunders
-77 Average centipawn loss
-68% Accuracy
-
-black:
-5 Inaccuracies
-4 Mistakes
-4 Blunders
-76 Average centipawn loss
-70% Accuracy 
-
-###### g2: 
-white:
-6 Inaccuracies
-2 Mistakes
-0 Blunders
-41 Average centipawn loss
-83% Accuracy
-
-black:
-3 Inaccuracies
-3 Mistakes
-0 Blunders
-41 Average centipawn loss
-82% Accuracy 
-
-###### g3: 
-white:
-7 Inaccuracies
-2 Mistakes
-0 Blunders
-35 Average centipawn loss
-87% Accuracy
-black:
-3 Inaccuracies
-3 Mistakes
-1 Blunder
-47 Average centipawn loss
-83% Accuracy 
-
-###### g4: 
-white: 
-4 Inaccuracies
-2 Mistakes
-1 Blunder
-28 Average centipawn loss
-89% Accuracy
-black:
-2 Inaccuracies
-1 Mistake
-1 Blunder
-25 Average centipawn loss
-86% Accuracy 
-
-###### g5: 
-white:
-2 Inaccuracies
-2 Mistakes
-1 Blunder
-28 Average centipawn loss
-91% Accuracy
-black:
-5 Inaccuracies
-2 Mistakes
-3 Blunders
-44 Average centipawn loss
-88% Accuracy 
-
-###### g6: 
-white:
-5 Inaccuracies
-2 Mistakes
-3 Blunders
-82 Average centipawn loss
-85% Accuracy
-black:
-8 Inaccuracies
-0 Mistakes
-5 Blunders
-98 Average centipawn loss
-79% Accuracy 
-"""
-
 
 class TestACPLCalculation(unittest.TestCase):
     """Test Average Centipawn Loss (ACPL) calculation function"""
@@ -165,7 +75,7 @@ class TestACPLCalculation(unittest.TestCase):
         """Test ACPL calculation with g1.pgn"""
         with open("tests/sample_pgns/g1.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acpl, black_acpl = get_acpl(cps)
             # According to lichess: 
@@ -176,7 +86,7 @@ class TestACPLCalculation(unittest.TestCase):
         """Test ACPL calculation with g2.pgn"""
         with open("tests/sample_pgns/g2.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acpl, black_acpl = get_acpl(cps)
             # According to lichess: 
@@ -187,7 +97,7 @@ class TestACPLCalculation(unittest.TestCase):
         """Test ACPL calculation with g3.pgn"""
         with open("tests/sample_pgns/g3.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acpl, black_acpl = get_acpl(cps)
             # According to lichess: 
@@ -198,7 +108,7 @@ class TestACPLCalculation(unittest.TestCase):
         """Test ACPL calculation with g4.pgn"""
         with open("tests/sample_pgns/g4.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acpl, black_acpl = get_acpl(cps)
             # According to lichess: 
@@ -209,7 +119,7 @@ class TestACPLCalculation(unittest.TestCase):
         """Test ACPL calculation with g5.pgn"""
         with open("tests/sample_pgns/g5.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acpl, black_acpl = get_acpl(cps)
             # According to lichess: 
@@ -220,12 +130,45 @@ class TestACPLCalculation(unittest.TestCase):
         """Test ACPL calculation with g6.pgn"""
         with open("tests/sample_pgns/g6.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acpl, black_acpl = get_acpl(cps)
             # According to lichess: 
             assert white_acpl == 82, f"Expected white ACPL = 82, got {white_acpl}"
             assert black_acpl == 98, f"Expected black ACPL = 98, got {black_acpl}"
+    
+    def test_get_acpl_g7(self):
+        """Test ACPL calculation with g7.pgn"""
+        with open("tests/sample_pgns/g7.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            evals, has_variation = extract_evals(game)
+            cps = evals_to_cps(evals)
+            white_acpl, black_acpl = get_acpl(cps)
+            # According to lichess: 
+            assert white_acpl == 50, f"Expected white ACPL = 50, got {white_acpl}"
+            assert black_acpl == 49, f"Expected black ACPL = 49, got {black_acpl}"
+
+    def test_get_acpl_g8(self):
+        """Test ACPL calculation with g8.pgn"""
+        with open("tests/sample_pgns/g8.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            evals, has_variation = extract_evals(game)
+            cps = evals_to_cps(evals)
+            white_acpl, black_acpl = get_acpl(cps)
+            # According to lichess: 
+            assert white_acpl == 39, f"Expected white ACPL = 39, got {white_acpl}"
+            assert black_acpl == 73, f"Expected black ACPL = 73, got {black_acpl}"
+    
+    def test_get_acpl_g9(self):
+        """Test ACPL calculation with g9.pgn"""
+        with open("tests/sample_pgns/g9.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            evals, has_variation = extract_evals(game)
+            cps = evals_to_cps(evals)
+            white_acpl, black_acpl = get_acpl(cps)
+            # According to lichess: 
+            assert white_acpl == 75, f"Expected white ACPL = 75, got {white_acpl}"
+            assert black_acpl == 67, f"Expected black ACPL = 67, got {black_acpl}"
 
 
 class TestErrorCounting(unittest.TestCase):
@@ -245,7 +188,8 @@ class TestErrorCounting(unittest.TestCase):
         """Test error counting with perfect play (no errors)"""
         # Small improvements or equal positions
         cps = [Cp(15), Cp(20), Cp(25), Cp(30), Cp(35)]
-        errors = count_errors(cps)
+        has_variation = [True] * len(cps)
+        errors = count_errors(cps, has_variation)
         
         expected = {
             "white": {"blunder": 0, "mistake": 0, "inaccuracy": 0},
@@ -258,7 +202,8 @@ class TestErrorCounting(unittest.TestCase):
         # Create a position where white loses significant advantage
         # This requires understanding the centipawn_to_winchance function
         cps = [Cp(300), Cp(-200), Cp(-150)]  # White blunders from +300 to -200
-        errors = count_errors(cps)
+        has_variation = [True] * len(cps)
+        errors = count_errors(cps, has_variation)
         
         # White should have at least one blunder
         assert errors["white"]["blunder"] >= 1, "Expected white blunder, got " + str(errors)
@@ -268,7 +213,8 @@ class TestErrorCounting(unittest.TestCase):
         """Test counting black mistake (0.2-0.3 winchance loss)"""
         # Create a position where black makes a mistake
         cps = [Cp(-100), Cp(-50), Cp(100)]  # Black position gets worse from black's perspective
-        errors = count_errors(cps)
+        has_variation = [True] * len(cps)
+        errors = count_errors(cps, has_variation)
         
         # Black should have some error (mistake or blunder)
         total_black_errors = sum(errors["black"].values())
@@ -280,7 +226,8 @@ class TestErrorCounting(unittest.TestCase):
         # This test may need adjustment based on the exact centipawn values
         # that correspond to 0.1-0.2 winchance differences
         cps = [Cp(50), Cp(20), Cp(60), Cp(30)]
-        errors = count_errors(cps)
+        has_variation = [True] * len(cps)
+        errors = count_errors(cps, has_variation)
         
         # At least one player should have some errors
         total_errors = sum(errors["white"].values()) + sum(errors["black"].values())
@@ -290,7 +237,8 @@ class TestErrorCounting(unittest.TestCase):
     def test_count_errors_structure(self):
         """Test that error counting returns correct structure"""
         cps = [Cp(15), Cp(50), Cp(20), Cp(80), Cp(30)]
-        errors = count_errors(cps)
+        has_variation = [True] * len(cps)
+        errors = count_errors(cps, has_variation)
         
         # Check structure
         assert "white" in errors, "Missing 'white' key in errors"
@@ -411,6 +359,36 @@ class TestErrorCounting(unittest.TestCase):
             assert b_b == 4, f"Expected black blunder = 4, got {b_b}"
             assert b_m == 1, f"Expected black mistake = 1, got {b_m}"
             assert b_i == 5, f"Expected black inaccuracy = 5, got {b_i}"
+    
+    def test_count_errors_g8(self):
+        """Test error counting with g8.pgn"""
+        with open("tests/sample_pgns/g8.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
+            w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
+            b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
+            assert w_b == 1, f"Expected white blunder = 1, got {w_b}"
+            assert w_m == 0, f"Expected white mistake = 0, got {w_m}"
+            assert w_i == 4, f"Expected white inaccuracy = 4, got {w_i}"
+            assert b_b == 2, f"Expected black blunder = 2, got {b_b}"
+            assert b_m == 2, f"Expected black mistake = 2, got {b_m}"
+            assert b_i == 5, f"Expected black inaccuracy = 5, got {b_i}"
+    
+    def test_count_errors_g9(self):
+        """Test error counting with g9.pgn"""
+        with open("tests/sample_pgns/g9.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            evals, has_variation = extract_evals(game)
+            errors = count_errors(evals, has_variation)
+            w_b, w_m, w_i = errors["white"]["blunder"], errors["white"]["mistake"], errors["white"]["inaccuracy"]
+            b_b, b_m, b_i = errors["black"]["blunder"], errors["black"]["mistake"], errors["black"]["inaccuracy"]
+            assert w_b == 11, f"Expected white blunder = 11, got {w_b}"
+            assert w_m == 2, f"Expected white mistake = 2, got {w_m}"
+            assert w_i == 9, f"Expected white inaccuracy = 9, got {w_i}"
+            assert b_b == 9, f"Expected black blunder = 9, got {b_b}"
+            assert b_m == 2, f"Expected black mistake = 2, got {b_m}"
+            assert b_i == 4, f"Expected black inaccuracy = 4, got {b_i}"
 
 
 class TestGameAccuracy(unittest.TestCase):
@@ -476,7 +454,7 @@ class TestGameAccuracy(unittest.TestCase):
         """Test accuracy calculation with g1.pgn"""
         with open("tests/sample_pgns/g1.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acc, black_acc = game_accuracy(cps)
             assert white_acc == 68, f"Expected white accuracy = 68, got {white_acc}"
@@ -486,7 +464,7 @@ class TestGameAccuracy(unittest.TestCase):
         """Test accuracy calculation with g2.pgn"""
         with open("tests/sample_pgns/g2.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acc, black_acc = game_accuracy(cps)
             assert white_acc == 83, f"Expected white accuracy = 83, got {white_acc}"
@@ -496,7 +474,7 @@ class TestGameAccuracy(unittest.TestCase):
         """Test accuracy calculation with g3.pgn"""
         with open("tests/sample_pgns/g3.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acc, black_acc = game_accuracy(cps)
             assert white_acc == 87, f"Expected white accuracy = 87, got {white_acc}"
@@ -506,7 +484,7 @@ class TestGameAccuracy(unittest.TestCase):
         """Test accuracy calculation with g4.pgn"""
         with open("tests/sample_pgns/g4.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acc, black_acc = game_accuracy(cps)
             assert white_acc == 89, f"Expected white accuracy = 89, got {white_acc}"
@@ -516,7 +494,7 @@ class TestGameAccuracy(unittest.TestCase):
         """Test accuracy calculation with g5.pgn"""
         with open("tests/sample_pgns/g5.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acc, black_acc = game_accuracy(cps)
             assert white_acc == 91, f"Expected white accuracy = 91, got {white_acc}"
@@ -526,13 +504,31 @@ class TestGameAccuracy(unittest.TestCase):
         """Test accuracy calculation with g6.pgn"""
         with open("tests/sample_pgns/g6.pgn", "r") as f:
             game = chess.pgn.read_game(f)
-            evals = extract_evals(game)
+            evals, has_variation = extract_evals(game)
             cps = evals_to_cps(evals)
             white_acc, black_acc = game_accuracy(cps)
             assert white_acc == 85, f"Expected white accuracy = 85, got {white_acc}"
             assert black_acc == 79, f"Expected black accuracy = 79, got {black_acc}"
     
+    def test_game_accuracy_g8(self):
+        """Test accuracy calculation with g8.pgn"""
+        with open("tests/sample_pgns/g8.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            evals, has_variation = extract_evals(game)
+            cps = evals_to_cps(evals)
+            white_acc, black_acc = game_accuracy(cps)
+            assert white_acc == 92, f"Expected white accuracy = 92, got {white_acc}"
+            assert black_acc == 83, f"Expected black accuracy = 83, got {black_acc}"
 
+    def test_game_accuracy_g9(self):
+        """Test accuracy calculation with g9.pgn"""
+        with open("tests/sample_pgns/g9.pgn", "r") as f:
+            game = chess.pgn.read_game(f)
+            evals, has_variation = extract_evals(game)
+            cps = evals_to_cps(evals)
+            white_acc, black_acc = game_accuracy(cps)
+            assert white_acc == 68, f"Expected white accuracy = 68, got {white_acc}"
+            assert black_acc == 69, f"Expected black accuracy = 69, got {black_acc}"
 
 
 if __name__ == '__main__':

@@ -81,7 +81,7 @@ def cleanup_checkpoints(pgn_file_path: str):
     for file_checkpoint_part in CHECKPOINT_DIR.glob(f"{base_filename}_p*_checkpoint.json"):
         file_checkpoint_part.unlink()
 
-
+# TODO: zaten eval bir oyun ise ne oluyor? variation lar nasıl gözüküyor? 
 def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
     """
     Returns the evaluated game
@@ -102,7 +102,7 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
         
         game = game.next()
 
-        while not game.is_end():
+        while True:
             info = engine.analyse(game.board(), 
                                   chess.engine.Limit(depth=cfg.STOCKFISH_LIMIT_DEPTH, time=cfg.STOCKFISH_LIMIT_TIME))
 
@@ -116,6 +116,9 @@ def eval_game(game: chess.pgn.Game) -> chess.pgn.Game:
                 if game.next().move != info["pv"][0]:
                     # Add the first move to the variation
                     game.add_variation(info["pv"][0]) 
+
+            if game.is_end():
+                break
             
             game = game.next()
 
@@ -228,6 +231,14 @@ def main(args):
         elapsed_hours = (end - start) / 3600
         PrintInLine.print(3+args.num_processes+1, f"{fnames} is done. Elapsed time: {elapsed_hours:.2f} h, {elapsed_hours / game_count:.2f} hours/game")
 
+
+# def debug():
+#     with open("sample/dummy.pgn") as f:
+#         game = chess.pgn.read_game(f)
+#     game = eval_game(game)
+#     with open("sample/dummy_e.pgn", "w") as f:
+#         exporter = chess.pgn.FileExporter(f)
+#         game.accept(exporter)
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Evaluate pgn files with Stockfish")

@@ -283,8 +283,8 @@ if __name__ == "__main__":
 
     arg_parser = argparse.ArgumentParser(description="Download and filter lichess games")
     arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Directory to save and filter pgn files (default: lichess_db)")
-    arg_parser.add_argument("-np", "--num_processes", type=int, default=6, help="Number of processes to use for filtering (default 8)")
-    arg_parser.add_argument("-nt", "--num_threads", type=int, default=2, help="Number of threads to use for downloading (default 3)")
+    arg_parser.add_argument("-np", "--num_processes", type=int, default=6, help="Number of processes to use for filtering (default 6)")
+    arg_parser.add_argument("-nt", "--num_threads", type=int, default=2, help="Number of threads to use for downloading (default 2)")
     args = arg_parser.parse_args()
     
     main(args)

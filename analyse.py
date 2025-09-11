@@ -17,7 +17,6 @@ from utils import get_rating_bin, get_time_control
 
 Eval = Union[Cp, Mate]
 
-
 CEILING = 1000
 INITIAL_CP = 15
 
@@ -47,16 +46,13 @@ def get_acpl(cps: List[float]) -> Tuple[float, float]:
 
     return round_to_int(white_acpl), round_to_int(black_acpl)
 
-
 def clip(value: int, min_val: int, max_val: int) -> int:
     return min(max(value, min_val), max_val)
-
 
 # Based on https://github.com/lichess-org/scalachess/blob/42725a2e43bd3d18f0db5c2b1329edbcef457c46/core/src/main/scala/eval.scala#L79-L89
 # [0, 100]
 def centipawn_to_winpercent(cp: int) -> float:
     return 50 + 50 * centipawn_to_winchance(clip(cp, -CEILING, CEILING))
-
 
 # [-1, 1]
 def centipawn_to_winchance(cp: int) -> float:
@@ -74,7 +70,6 @@ def winpercents_to_accuracy(before_winpercent: float, after_winpercent: float) -
     raw += 1  # // uncertainty bonus (due to imperfect analysis)
     return clip(raw, 0, 100)
 
-
 def weighted_mean(pairs: List[Tuple[float, float]]) -> Optional[float]:
     """Calculate weighted mean from (value, weight) pairs"""
     if not pairs:
@@ -82,13 +77,11 @@ def weighted_mean(pairs: List[Tuple[float, float]]) -> Optional[float]:
     values, weights = zip(*pairs)
     return np.average(values, weights=weights)
 
-
 def harmonic_mean(values: List[float]) -> Optional[float]:
     """Calculate harmonic mean"""
     if not values:
         return None
     return statistics.harmonic_mean(values)
-
 
 # Based on https://github.com/lichess-org/lila/blob/4336bf020e746413e0039f1583a186442084bafa/modules/analyse/src/main/AccuracyPercent.scala#L81-L115
 def game_accuracy(cps: List[float]) -> Tuple[int, int]:
@@ -164,8 +157,6 @@ def game_accuracy(cps: List[float]) -> Tuple[int, int]:
     # Return accuracies for both colors
     return round_to_int(color_accuracy(True)), round_to_int(color_accuracy(False))
 
-
-
 def detect_mate_sequence(prev_mate: Optional[int], curr_mate: Optional[int]) -> Optional[str]:
     """
     Detect mate sequence based on previous and current mate evaluations
@@ -180,7 +171,6 @@ def detect_mate_sequence(prev_mate: Optional[int], curr_mate: Optional[int]) -> 
     if prev_mate is not None and curr_mate is not None:
         return "MateDelayed"
     return None
-
 
 # Based on https://github.com/lichess-org/lila/blob/master/modules/tree/src/main/Advice.scala
 def count_errors(evals: List[Eval], has_variation: List[bool], verbose: bool = False) -> Dict[str, Dict[str, int]]:
@@ -279,7 +269,6 @@ def count_errors(evals: List[Eval], has_variation: List[bool], verbose: bool = F
 
     return errors
 
-
 def extract_cps(game: chess.pgn.Game) -> List[float]:
     # assumes that game has at least one move
     cps = [INITIAL_CP]
@@ -327,11 +316,17 @@ def extract_evals(game: chess.pgn.Game) -> Tuple[List[Eval], List[bool]]:
         else:
             has_variation.append(False)
 
+        if game.is_end():
+            if game.board().is_checkmate():
+                eval = Mate(0)
+                has_variation.pop()
+            else:
+                eval = game.eval().white()        
+                evals.append(eval)            
+            break
+
         eval = game.eval().white()
         evals.append(eval)
-
-        if game.is_end():
-            break
 
         game = game.next()
     
@@ -340,7 +335,6 @@ def extract_evals(game: chess.pgn.Game) -> Tuple[List[Eval], List[bool]]:
     assert len(evals) == len(has_variation) + 1, f"{len(evals)=} != {len(has_variation)=} + 1"
     
     return evals, has_variation
-
 
 def evals_to_cps(evals: List[Eval]) -> List[float]:
     cps = []
@@ -355,28 +349,31 @@ def evals_to_cps(evals: List[Eval]) -> List[float]:
 
     return cps
 
-
-
-def extract_date_from_filename(filename: str) -> Optional[str]:
+def extract_date_from_filename(filename: str) -> str:
     """
     Extract date from PGN filename in format YYYY-MM
     Expected format: lichess_db_standard_rated_YYYY-MM_*.pgn
     """
     match = re.search(r'(\d{4}-\d{2})', filename)
-    return match.group(1) if match else None
+    if not match:
+        raise ValueError(f"Could not extract date from filename: {filename}")
+
+    return match.group(1)
 
 
-def extract_game_id_from_site(site: str) -> Optional[str]:
+def extract_game_id_from_site(site: str) -> str:
     """
     Extract game ID from Site field
     Expected format: [Site "https://lichess.org/GAME_ID"]
     """
-    if not site:
-        return None
     
     # Extract the part after "lichess.org/"
     match = re.search(r'lichess\.org/([a-zA-Z0-9]+)', site)
-    return match.group(1) if match else None
+
+    if not match:
+        return "N/A"
+
+    return match.group(1)
 
 
 def check_for_duplicates_in_database(conn: sqlite3.Connection, date: str) -> Dict[str, int]:
@@ -449,7 +446,6 @@ def create_database(db_path: str = "chess_metrics.db") -> sqlite3.Connection:
     
     # Create index for faster queries
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_date ON game_metrics(date)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_game_id ON game_metrics(game_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_bin ON game_metrics(bin)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_tempo ON game_metrics(tempo)')
     
@@ -457,10 +453,10 @@ def create_database(db_path: str = "chess_metrics.db") -> sqlite3.Connection:
     return conn
 
 
-def extract_game_metrics(game: chess.pgn.Game, date: str) -> Optional[Dict]:
+def extract_game_metrics(game: chess.pgn.Game, date: str) -> Dict:
     """
     Extract metrics from a single game and return as dictionary
-    Returns None if the game cannot be processed
+    Raises an error if the game cannot be processed
     """
     w_elo, b_elo = game.headers.get('WhiteElo'), game.headers.get('BlackElo')
         
@@ -771,7 +767,7 @@ def main(args):
 # if __name__ == "__main__":
 #     # for i in range(6, 8):
 #     if True:
-#         with open("tests/sample_pgns/g5.pgn", "r") as f:
+#         with open("tests/sample_pgns/g9.pgn", "r") as f:
 #             game = chess.pgn.read_game(f)
 #             evals, has_variation = extract_evals(game)
 #             cps = evals_to_cps(evals)
@@ -784,7 +780,7 @@ def main(args):
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Analyse PGN files and store metrics in database")
-    arg_parser.add_argument("-p", "--pgn_dir", type=str, default="temp_db", help="Primary directory to process PGN files")
+    arg_parser.add_argument("-p", "--pgn_dir", type=str, default="lichess_db", help="Primary directory to process PGN files")
     arg_parser.add_argument("--db-path", type=str, default="chess_metrics.db", help="Path to SQLite database file")
     arg_parser.add_argument("-s", "--stats", action="store_true", help="Print database statistics")
     
