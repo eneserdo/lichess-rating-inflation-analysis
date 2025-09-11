@@ -169,14 +169,6 @@ def extract_games(game_info_path: str, pgn_path: str):
                 counter[tempo][bin] += 1
                 pgn_db.seek(int(offset))
                 game = chess.pgn.read_game(pgn_db)
-                if not game.headers["TimeControl"] == time_control:
-                    raise ValueError("wtf")
-                if not bin == get_rating_bin((int(game.headers["WhiteElo"]) + int(game.headers["BlackElo"])) / 2):
-                    raise ValueError("wtf")
-                    
-                if not tempo == get_time_control(game.headers["TimeControl"]):
-                    raise ValueError("wtf")
-                    
                 game.accept(exporter)
                 counter["total"] += 1
                 counter["players"][white] += 1
