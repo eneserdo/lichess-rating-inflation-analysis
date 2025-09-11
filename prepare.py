@@ -113,6 +113,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
         while curr < end:
             pbar(curr - start, end - start, f"Filtering {pgn_name} p{idx:02d}", 3 + NUM_THREADS + idx)
 
+            curr_game = pgn_db.tell()
             game_headers = chess.pgn.read_headers(pgn_db)
             if game_headers is None:
                 break
@@ -129,7 +130,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
                 if tempo is None or bin is None:
                     continue
 
-                game_info = f"{w_name} {b_name} {w_elo} {b_elo} {result} {time_control} {curr}\n"
+                game_info = f"{w_name} {b_name} {w_elo} {b_elo} {result} {time_control} {curr_game}\n"
                 f_out.write(game_info)
 
             curr = pgn_db.tell()
@@ -168,6 +169,14 @@ def extract_games(game_info_path: str, pgn_path: str):
                 counter[tempo][bin] += 1
                 pgn_db.seek(int(offset))
                 game = chess.pgn.read_game(pgn_db)
+                if not game.headers["TimeControl"] == time_control:
+                    raise ValueError("wtf")
+                if not bin == get_rating_bin((int(game.headers["WhiteElo"]) + int(game.headers["BlackElo"])) / 2):
+                    raise ValueError("wtf")
+                    
+                if not tempo == get_time_control(game.headers["TimeControl"]):
+                    raise ValueError("wtf")
+                    
                 game.accept(exporter)
                 counter["total"] += 1
                 counter["players"][white] += 1
@@ -215,7 +224,7 @@ def processor_process(filter_queue, num_processes):
     while True:
         pgn_path = filter_queue.get()
         if pgn_path is None:  # Signal to stop
-            print("Stopping processor")
+            print("\n\n\nDone!\n")
             break
 
 
