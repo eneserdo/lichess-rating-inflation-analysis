@@ -113,6 +113,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
         while curr < end:
             pbar(curr - start, end - start, f"Filtering {pgn_name} p{idx:02d}", 3 + NUM_THREADS + idx)
 
+            curr_game = pgn_db.tell()
             game_headers = chess.pgn.read_headers(pgn_db)
             if game_headers is None:
                 break
@@ -129,7 +130,7 @@ def filter_games(pgn_db_path: str, idx: int, start: int, end: int):
                 if tempo is None or bin is None:
                     continue
 
-                game_info = f"{w_name} {b_name} {w_elo} {b_elo} {result} {time_control} {curr}\n"
+                game_info = f"{w_name} {b_name} {w_elo} {b_elo} {result} {time_control} {curr_game}\n"
                 f_out.write(game_info)
 
             curr = pgn_db.tell()
@@ -215,7 +216,7 @@ def processor_process(filter_queue, num_processes):
     while True:
         pgn_path = filter_queue.get()
         if pgn_path is None:  # Signal to stop
-            print("Stopping processor")
+            print("\n\n\nDone!\n")
             break
 
 
