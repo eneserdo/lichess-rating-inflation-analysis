@@ -138,12 +138,8 @@ def eval_pgn(pgn_file_path: str, idx: int, start: int, end: int):
     
     # Load process checkpoint
     checkpoint_data = load_process_checkpoint(pgn_file_path, idx)
-    current_position = checkpoint_data["current_position"]
+    current_position = checkpoint_data["current_position"] # Remove this
     games_evaluated = checkpoint_data["games_evaluated"]
-    
-    # If we have a checkpoint, adjust the start position
-    if current_position > start:
-        start = current_position
 
     with open(evaluated_pgn_file, "a" if current_position > start else "w") as f, open(pgn_file_path, "r") as pgn_file:
         exporter = chess.pgn.FileExporter(f)
@@ -176,7 +172,7 @@ def eval_pgn(pgn_file_path: str, idx: int, start: int, end: int):
             }
             save_process_checkpoint(pgn_file_path, idx, checkpoint_data)
             
-        pbar(curr - start, end - start, f"Evaluating {idx:02d}", 3+idx)
+        pbar(end - start, end - start, f"Evaluating {idx:02d}", 3+idx)
     return True
 
 
