@@ -5,6 +5,7 @@ import sys
 import time
 from collections import defaultdict
 from pprint import pprint
+from turtle import heading
 
 import chess
 import chess.pgn
@@ -257,9 +258,59 @@ def eval_benchmark_v2(game1: chess.pgn.Game, game2: chess.pgn.Game, hash_size: i
 
         return g1, g2
 
+def check_evaluated_pgn_dir(pgn_dir: str):
+
+    for pgn_file_evaluated in glob.glob(os.path.join(pgn_dir, "*_evaluated.pgn")):
+        pgn_file_original = pgn_file_evaluated.replace("_evaluated.pgn", ".pgn")
+        if not os.path.exists(pgn_file_original):
+            print(f"Original pgn file does not exist: {pgn_file_original}")
+            continue
+        
+        # count games
+        counter_evaluated = count_games(pgn_file_evaluated, return_counter=True)
+        counter_original = count_games(pgn_file_original, return_counter=True)
+        for tempo in cfg.TIME_CONTROL.keys():
+            for bin in cfg.RATING_BIN_MEANS:
+                if counter_evaluated[tempo][bin] != counter_original[tempo][bin]:
+                    print(f"Counter mismatch: {pgn_file_evaluated} {counter_evaluated[tempo][bin]} {pgn_file_original} {counter_original[tempo][bin]}")
+                    break
+        
+        # compare game headers
+        g_idx = 0
+        with open(pgn_file_evaluated, "r") as f_evaluated, open(pgn_file_original, "r") as f_original:
+            while True:
+                heading_evaluated = chess.pgn.read_headers(f_evaluated)
+                heading_original = chess.pgn.read_headers(f_original)
+                if heading_evaluated is None or heading_original is None:
+                    break
+                ev_game_id = heading_evaluated.get("Site").split("/")[-1]
+                ori_game_id = heading_original.get("Site").split("/")[-1]
+                if ev_game_id != ori_game_id:
+                    print(f"Game headers mismatch: {pgn_file_evaluated} {ev_game_id} {pgn_file_original} {ori_game_id}")
+                    break
+                g_idx += 1
+        
+        print("Total equal games: ", g_idx)
+            
+        # check if all games are evaluated
+        with open(pgn_file_evaluated, "r") as f_evaluated:
+            while True:
+                game_evaluated = chess.pgn.read_game(f_evaluated)
+                if game_evaluated is None:
+                    break
+                if not game_evaluated.next().eval():
+                    site = game_evaluated.headers.get("Site")
+                    print("Missing eval at game: ",  site)
+                    break
+
+        print("ok")
+    print("All ok")
+
 if __name__ == "__main__":
-    counter=count_games("lichess_db/lichess_db_standard_rated_2015-01_filtered_evaluated.pgn", return_counter=True)
-    pprint(counter)
+    # counter=count_games("lichess_db/lichess_db_standard_rated_2015-01_filtered_evaluated.pgn", return_counter=True)
+    # pprint(counter)
+
+    check_evaluated_pgn_dir("lichess_db")
 
 
         
