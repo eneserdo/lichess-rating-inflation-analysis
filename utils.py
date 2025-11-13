@@ -260,20 +260,38 @@ def eval_benchmark_v2(game1: chess.pgn.Game, game2: chess.pgn.Game, hash_size: i
 
 def check_evaluated_pgn_dir(pgn_dir: str):
 
-    for pgn_file_evaluated in glob.glob(os.path.join(pgn_dir, "*_evaluated.pgn")):
+    for pgn_file_evaluated in sorted(glob.glob(os.path.join(pgn_dir, "*_evaluated.pgn"))):
+        print("\n", "="*100)
+        print(f"Checking {os.path.basename(pgn_file_evaluated)}...")
+
         pgn_file_original = pgn_file_evaluated.replace("_evaluated.pgn", ".pgn")
         if not os.path.exists(pgn_file_original):
-            print(f"Original pgn file does not exist: {pgn_file_original}")
+            print("Original pgn file does not exist")
             continue
         
         # count games
         counter_evaluated = count_games(pgn_file_evaluated, return_counter=True)
         counter_original = count_games(pgn_file_original, return_counter=True)
-        for tempo in cfg.TIME_CONTROL.keys():
-            for bin in cfg.RATING_BIN_MEANS:
-                if counter_evaluated[tempo][bin] != counter_original[tempo][bin]:
-                    print(f"Counter mismatch: {pgn_file_evaluated} {counter_evaluated[tempo][bin]} {pgn_file_original} {counter_original[tempo][bin]}")
-                    break
+        total_evaluated = sum([counter_evaluated[tempo][bin] for tempo in cfg.TIME_CONTROL.keys() for bin in cfg.RATING_BIN_MEANS])
+        total_original = sum([counter_original[tempo][bin] for tempo in cfg.TIME_CONTROL.keys() for bin in cfg.RATING_BIN_MEANS])
+
+        if total_evaluated != total_original:
+            print(f"Total count mismatch ({total_original} != {total_evaluated})")
+        else:
+            print(f"Total count matched ({total_original}) ")
+
+        # compare counters
+        counter_matched = True
+        if total_evaluated == total_original:
+            for tempo in cfg.TIME_CONTROL.keys():
+                for bin in cfg.RATING_BIN_MEANS:
+                    if counter_evaluated[tempo][bin] != counter_original[tempo][bin]:
+                        print(f"Counter mismatch at {tempo} {bin}: {counter_evaluated[tempo][bin]} {counter_original[tempo][bin]}")
+                        counter_matched = False
+                        break
+        
+        if counter_matched:
+            print("All counters matched")
         
         # compare game headers
         g_idx = 0
@@ -286,31 +304,100 @@ def check_evaluated_pgn_dir(pgn_dir: str):
                 ev_game_id = heading_evaluated.get("Site").split("/")[-1]
                 ori_game_id = heading_original.get("Site").split("/")[-1]
                 if ev_game_id != ori_game_id:
-                    print(f"Game headers mismatch: {pgn_file_evaluated} {ev_game_id} {pgn_file_original} {ori_game_id}")
+                    print(f"Game headers mismatch: {ev_game_id} {ori_game_id}")
                     break
                 g_idx += 1
         
-        print("Total equal games: ", g_idx)
+        if g_idx == total_evaluated:
+            print("All game headers matched")
             
         # check if all games are evaluated
+        is_all_evaluated = True
+        is_first_iter= True
         with open(pgn_file_evaluated, "r") as f_evaluated:
             while True:
                 game_evaluated = chess.pgn.read_game(f_evaluated)
                 if game_evaluated is None:
+                    if is_first_iter:
+                        print("No games in the file")
                     break
+
+                is_first_iter = False
+                
                 if not game_evaluated.next().eval():
                     site = game_evaluated.headers.get("Site")
                     print("Missing eval at game: ",  site)
+                    is_all_evaluated = False
                     break
 
-        print("ok")
-    print("All ok")
+        if is_all_evaluated:
+            print("All games are evaluated")
+
+def get_game_by_id(pgn_file_path: str, game_id: int):
+    # return the nth game from the pgn file
+    with open(pgn_file_path, "r") as f:
+        idx = 0
+        while True:
+            game = chess.pgn.read_game(f)
+            if game is None:
+                print(f"Game {game_id} not found in {pgn_file_path}, total games: {idx}")
+                break
+            if idx == game_id:
+                return game
+            idx += 1
+    return None
+
+def get_game_by_position(pgn_file_path: str, position: int):
+    # return the game at the given position
+    with open(pgn_file_path, "r") as f:
+        f.seek(position)
+        game = chess.pgn.read_game(f)
+        return game
+        
 
 if __name__ == "__main__":
     # counter=count_games("lichess_db/lichess_db_standard_rated_2015-01_filtered_evaluated.pgn", return_counter=True)
     # pprint(counter)
 
-    check_evaluated_pgn_dir("lichess_db")
+    # check_evaluated_pgn_dir("/home/enerd/evaluated/lichess_db")
+    pgn_dir = "/home/enerd/evaluated/sample/lichess_db/lichess_db_standard_rated_2019-01_filtered.pgn"
+    
+    # boundaries = divide_pgn_file(pgn_dir, 8)
+    # for i, (start, end) in enumerate(boundaries):
+    #     print(f"Process {i}: {start} - {end}")
+    
+    """
+    1365947 ok
+    2326203
+    4097585 ok
+    5288541
+    6827110 ok
+    8191819 ok
+    9556966 ok
+    10920277 ok
+
+Process 0: 0 - 1365947
+Process 1: 1365947 - 2731647
+Process 2: 2731647 - 4097585
+Process 3: 4097585 - 5462378
+Process 4: 5462378 - 6827110
+Process 5: 6827110 - 8191819
+Process 6: 8191819 - 9556966
+Process 7: 9556966 - 10920277
+
+    """
+    
+    
+    
+    
+    game = get_game_by_position(pgn_dir, 2326203)
+    
+    if game is None:
+        print("Game is none")
+    else:
+        evaluated_game = __eval_game(game)
+    
+    print(".")
 
 
         
