@@ -1,3 +1,4 @@
+import argparse
 import datetime
 import glob
 import os
@@ -5,7 +6,6 @@ import sys
 import time
 from collections import defaultdict
 from pprint import pprint
-from turtle import heading
 
 import chess
 import chess.pgn
@@ -356,83 +356,18 @@ def get_game_by_position(pgn_file_path: str, position: int):
         
 
 if __name__ == "__main__":
-    # counter=count_games("lichess_db/lichess_db_standard_rated_2015-01_filtered_evaluated.pgn", return_counter=True)
-    # pprint(counter)
 
-    # check_evaluated_pgn_dir("/home/enerd/evaluated/lichess_db")
-    pgn_dir = "/home/enerd/evaluated/sample/lichess_db/lichess_db_standard_rated_2019-01_filtered.pgn"
-    
-    # boundaries = divide_pgn_file(pgn_dir, 8)
-    # for i, (start, end) in enumerate(boundaries):
-    #     print(f"Process {i}: {start} - {end}")
-    
-    """
-    1365947 ok
-    2326203
-    4097585 ok
-    5288541
-    6827110 ok
-    8191819 ok
-    9556966 ok
-    10920277 ok
+    arg_parser = argparse.ArgumentParser(description="Utilities")
 
-Process 0: 0 - 1365947
-Process 1: 1365947 - 2731647
-Process 2: 2731647 - 4097585
-Process 3: 4097585 - 5462378
-Process 4: 5462378 - 6827110
-Process 5: 6827110 - 8191819
-Process 6: 8191819 - 9556966
-Process 7: 9556966 - 10920277
+    # mode: calc counter or check evaluated pgn dir
+    arg_parser.add_argument("-m", "--mode", type=str, default="c", choices=["c", "e"], help="Mode: calc counter or check evaluated pgn dir")
+    arg_parser.add_argument("-i", "--input", type=str, required=True, help="Input directory or file")
+    args = arg_parser.parse_args()
 
-    """
-    
-    
-    
-    
-    game = get_game_by_position(pgn_dir, 2326203)
-    
-    if game is None:
-        print("Game is none")
+    if args.mode == "c":
+        counter = count_games(args.input, return_counter=True)
+        pprint(counter)
+    elif args.mode == "e":
+        check_evaluated_pgn_dir(args.input)
     else:
-        evaluated_game = __eval_game(game)
-    
-    print(".")
-
-
-        
-    # with open("sample/not_evaluated.pgn") as f:
-    #     game = chess.pgn.read_game(f)
-    # start = time.perf_counter()
-    # game = eval_benchmark(game, depth_limit=15)
-    # end = time.perf_counter()
-    # print(f"Time taken: {end - start:.4f} s")
-
-    # for hash_size in [32, 512, 1024, 2048]:
-    #     times_g1 = []
-    #     times_g2 = []
-    #     for run in range(10):
-    #         with open("sample/new2.pgn") as f:
-    #             game1 = chess.pgn.read_game(f)
-    #         with open("sample/new2.pgn") as f:
-    #             game2 = chess.pgn.read_game(f)
-
-    #         g1, g2 = eval_benchmark_v2(game1, game2, depth_limit=18, hash_size=hash_size, num_threads=1)
-    #         times_g1.append(g1)
-    #         times_g2.append(g2)
-
-    #     print(f"1st game: {sum(times_g1) / len(times_g1):.3f}, 2nd game: {sum(times_g2) / len(times_g2):.3f} s for hash_size: {hash_size}")
-
-
-    # pprint(game)
-    # count_games("sample/subset_evaluated.pgn")
-
-    # PrintInLine.print(1, "Hello")
-    # PrintInLine.print(2, "World")
-    # PrintInLine.print(3, "Helloasdfasdf")
-    # time.sleep(1)
-    # PrintInLine.print(3, "Hello")
-    # PrintInLine.print(4, "World")
-    # c=count_players("lichess_db/lichess_db_standard_rated_2018-01_filtered.pgn")
-    # pprint(c)
-    # check_player_distribution("lichess_db")
+        raise ValueError(f"Invalid mode: {args.mode}")
