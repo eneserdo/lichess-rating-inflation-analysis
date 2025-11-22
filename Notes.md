@@ -4,10 +4,10 @@
     - Formulation of centipawns -> win percentage -> accuracy per move -> accuracy per game
     -                                             -> misplay/error count (blunder, mistake, inaccuracy)
 
-1. How ratings of the players and accuracy of moves are correlated in chess?
+1. How ratings of the players and accuracy of games are correlated in chess?
     - How this correlation evolves over time?
-    - How much the accuracy and number of mistakes differs between Players with similar ratings?
-    - How much the accuracy and number of mistakes differs between, for instance, Players with 1500 rating and 1700 rating?
+    - How much the accuracy and number of mistakes differs between players with similar ratings?
+    - How much the accuracy and number of mistakes differs between, for instance, players with 1500 rating and 1700 rating? Look for rating hell.
 
 2. Is there an inflation or deflation in ratings?
     - Definition of inflation/deflation
@@ -17,6 +17,9 @@
 
 3. Choosing a sample of players, how their ratings and accuracy evolve over time?
 
+4. Given the game thinking time, how the accuracy of the moves differs between different rating ranges?
+
+
 We are omitting some nuances of the game:
 - In different game phases or when there is not much time, move accuracy might change. We are basically averaging all moves assuming that in average those effects will cancel out.
 
@@ -24,13 +27,13 @@ We are omitting some nuances of the game:
 
 I used the Lichess database to get the data, which is publicly available [here](https://database.lichess.org/).
 
-I downloaded the games from 2015 to 2024 every 6 months. 
+I downloaded the games from 2017 to 2025 every 6 months. 
 
 For the analysis, I only considered rated games played by signed users. I filtered the games where rating gain/loss is less than 15, so that rating gain/loss ...
 
 
 # Analysis
-I used Stockfish 17 to evaluate the moves in 20 depth. I used the 
+I used Stockfish 17 to evaluate the moves in 25 depth. I used the 
 
 
 

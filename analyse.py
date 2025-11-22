@@ -1,12 +1,10 @@
 import argparse
-import copy
 import glob
 import math
 import os
 import re
 import sqlite3
 import statistics
-from pathlib import Path
 from typing import Dict, Generator, List, Optional, Tuple, Union
 
 import chess.pgn
@@ -30,7 +28,6 @@ def get_acpl(cps: List[float]) -> Tuple[float, float]:
     
     diffs = np.diff(np.array(cps))
 
-    # TODO: mat olunca cpl de nasıl hesaplanıyor kontrol et
     # # Filter out positions where mate was found
     # mate_mask = np.abs(evals) >= 9000
     # diffs = diffs[~mate_mask[:-1]]
@@ -523,6 +520,7 @@ def extract_metrics_from_file(pgn_file_path: str) -> Generator[Dict, None, None]
     games_extracted = 0
     seen_games = set()  # Track potential duplicates within the file
     duplicates_in_file = 0
+    low_move_count = 0
     
     
     with open(pgn_file_path, "r") as pgn_file:
@@ -531,17 +529,19 @@ def extract_metrics_from_file(pgn_file_path: str) -> Generator[Dict, None, None]
             game = chess.pgn.read_game(pgn_file)
             if game is None:
                 break
+            
+            # if a game has less than 5 moves, skip it
+            if len(list(game.mainline_moves())) < 5:
+                low_move_count += 1
+                continue
                 
             games_processed += 1
-            
-            # Print progress every 100 games
-            if games_processed % 100 == 0:
-                print(f"  Processed {games_processed} games, extracted {games_extracted} valid games")
             
             metrics = extract_metrics_from_game(game, date)
 
             # Create a signature for duplicate detection within the file
             # Use game_id if available, otherwise fall back to other fields
+            # TODO: make a single signature for duplicate detection
             if metrics['game_id']:
                 game_signature = metrics['game_id']
             else:
@@ -552,23 +552,21 @@ def extract_metrics_from_file(pgn_file_path: str) -> Generator[Dict, None, None]
             
             if game_signature in seen_games:
                 duplicates_in_file += 1
-                if duplicates_in_file <= 5:  # Only show first 5 warnings to avoid spam
-                    game_id_info = f"ID={metrics['game_id']}" if metrics['game_id'] else f"W{metrics['w_elo']} vs B{metrics['b_elo']}"
-                    print(f"⚠️  Potential duplicate within file: {game_id_info}, result={metrics['game_result']}")
+                game_id_info = f"ID={metrics['game_id']}" if metrics['game_id'] else f"W{metrics['w_elo']} vs B{metrics['b_elo']}"
+                print(f"Potential duplicate within file: {game_id_info}, result={metrics['game_result']}")
             else:
                 seen_games.add(game_signature)
             
             games_extracted += 1
+            
+            # # Print progress every 100 games
+            # if games_processed % 100 == 0:
+            #     print(f"  Processed {games_processed} games, extracted {games_extracted} valid games")
+            
             yield metrics
 
-                
-            # except Exception as e:
-            #     print(f"Error reading game {games_processed}: {e}")
-            #     continue
     
-    completion_msg = f"Completed {pgn_file_path}: {games_processed} games processed, {games_extracted} valid games extracted"
-    if duplicates_in_file > 0:
-        completion_msg += f", {duplicates_in_file} potential intra-file duplicates detected"
+    completion_msg = f"Completed {get_date_from_fname(pgn_file_path)}: {games_processed} processed, {games_extracted} valid, {low_move_count} low move"
     print(completion_msg)
 
 
@@ -621,9 +619,8 @@ def process_all_pgn_files(pgn_dir: str, db_path: str = "chess_metrics.db"):
     print(f"\n{'='*60}")
     print("DATABASE PROCESSING COMPLETE!")
     print(f"{'='*60}")
-    print(f"📈 Total games successfully inserted: {final_total}")
-    print(f"📊 Total games in database: {final_total}")
-    print(f"💾 Database saved as: {db_path}")
+    print(f"Total games in database: {final_total}")
+    print(f"Database saved as: {db_path}")
         
     print(f"{'='*60}")
 
@@ -686,20 +683,6 @@ def main(args):
     process_all_pgn_files(args.pgn_dir, args.db_path)
     print_database_stats(args.db_path)
 
-
-# if __name__ == "__main__":
-#     # for i in range(6, 8):
-#     if True:
-#         with open("tests/sample_pgns/g9.pgn", "r") as f:
-#             game = chess.pgn.read_game(f)
-#             evals, has_variation = extract_evals(game)
-#             cps = evals_to_cps(evals)
-#             w_acpl, b_acpl = get_acpl(cps)
-#             print("w_acpl: ", w_acpl, "b_acpl: ", b_acpl)
-#             print("game_accuracy: ", game_accuracy(cps))
-#             from pprint import pprint
-#             pprint(count_errors(evals, has_variation, verbose=True))
-#             print("-"*100)
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Analyse PGN files and store metrics in database")

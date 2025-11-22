@@ -1,12 +1,14 @@
-import math
+import sqlite3
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-sns.set_theme()
+import config as cfg
+from analyse import centipawn_to_winpercent, winpercents_to_accuracy
 
-from utils import centipawn_to_winpercent, winpercents_to_accuracy
+sns.set_theme()
 
 
 def plot_winpercent_formula():
@@ -85,10 +87,105 @@ def plot_accuracy_formula():
                 facecolor='white', 
                 edgecolor='none')
 
+"""
+This is the schema of the database:
+        CREATE TABLE IF NOT EXISTS game_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            game_id TEXT NOT NULL,
+            w_elo INTEGER NOT NULL,
+            b_elo INTEGER NOT NULL,
+            bin TEXT NOT NULL,
+            game_result TEXT NOT NULL,
+            time_control TEXT NOT NULL,
+            tempo TEXT,
+            w_acpl REAL,
+            w_accuracy REAL,
+            w_inaccuracies INTEGER,
+            w_mistakes INTEGER,
+            w_blunders INTEGER,
+            b_acpl REAL,
+            b_accuracy REAL,
+            b_inaccuracies INTEGER,
+            b_mistakes INTEGER,
+            b_blunders INTEGER,
+            UNIQUE(game_id)
+        )
+
+"""
+
+def get_accuracy_rating_data(year: str, tempo: str) -> List[Tuple[float, float]]:
+    # Connects to database, for each game, gets the game accuracy and rating for each side
+    # I am aware that repeatedly calling this function will be inefficient, but it is what it is
+
+    conn = sqlite3.connect("chess_metrics.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT w_accuracy, w_elo, b_accuracy, b_elo FROM game_metrics WHERE date LIKE ? AND tempo = ?", (f"{year}%", tempo))
+    data = cursor.fetchall()
+    conn.close()
+
+    games = []
+    for datum in data:
+        w_accuracy, w_elo, b_accuracy, b_elo = datum
+        games.append((w_accuracy, w_elo))
+        games.append((b_accuracy, b_elo))
+
+    return np.array(games)
+
+
+def plot1():
+    # calculate the correlation between accuracy and rating for each year and plot a line plot
+    # repeat for each tempo so that we have N lines
+    
+    corr_coeffs = {tempo: [] for tempo in cfg.TIME_CONTROL.keys()}
+
+    for tempo in cfg.TIME_CONTROL.keys():
+        for year in cfg.EVERY_N_MONTHS:
+            data = get_accuracy_rating_data(year, tempo)
+            plt.figure(figsize=(10, 6), dpi=100)
+            plt.scatter(data[:, 0], data[:, 1])
+            plt.grid(True, linestyle='-', alpha=0.7)
+            plt.tight_layout()
+
+            # fit a line
+            slope, intercept = np.polyfit(data[:, 0], data[:, 1], 1)
+            plt.plot(data[:, 0], slope * data[:, 0] + intercept, color='red')
+
+            plt.title(f"Accuracy vs Rating for {tempo} in {year}")
+            plt.xlabel("Accuracy")
+            plt.ylabel("Rating")
+            plt.savefig(f"accuracy_rating_correlation_{tempo}_{year}.png", 
+                        bbox_inches='tight', 
+                        facecolor='white', 
+                        edgecolor='none')
+
+            plt.close()
+
+            corr_coeffs[tempo].append(np.corrcoef(data[:, 0], data[:, 1])[0, 1])
+
+
+    plt.figure(figsize=(10, 6), dpi=100)
+    plt.title("Accuracy vs Rating Correlation")
+    plt.xlabel("Year")
+    plt.ylabel("Correlation Coefficient")
+    for tempo in cfg.TIME_CONTROL.keys():
+        plt.plot(cfg.EVERY_N_MONTHS, corr_coeffs[tempo], label=tempo)
+    plt.legend()
+    plt.show()
+
+    plt.savefig("accuracy_rating_correlation.png", 
+                bbox_inches='tight', 
+                facecolor='white', 
+                edgecolor='none')
+
+
+
 
 if __name__ == '__main__':
-    plot_winpercent_formula()
-    plot_accuracy_formula()
+    # plot_winpercent_formula()
+    # plot_accuracy_formula()
+    g1=get_accuracy_rating_data("2017-01", "bullet")
+    g2=get_accuracy_rating_data("2017-01", "blitz")
 
     # read json file and load: game accuracy, error counts, acpl
     # json[tempo][rating][game_identifier] = {
