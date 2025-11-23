@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +10,7 @@ from analyse import centipawn_to_winpercent, winpercents_to_accuracy
 
 sns.set_theme()
 
-
+#### Plots of Formulas ####
 def plot_winpercent_formula():
     # Create figure with seaborn styling
     plt.figure(figsize=(10, 6), dpi=100)  # Larger, higher resolution figure
@@ -87,111 +87,137 @@ def plot_accuracy_formula():
                 facecolor='white', 
                 edgecolor='none')
 
+#### Plots of Data ####
 """
-This is the schema of the database:
-        CREATE TABLE IF NOT EXISTS game_metrics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT NOT NULL,
-            game_id TEXT NOT NULL,
-            w_elo INTEGER NOT NULL,
-            b_elo INTEGER NOT NULL,
-            bin TEXT NOT NULL,
-            game_result TEXT NOT NULL,
-            time_control TEXT NOT NULL,
-            tempo TEXT,
-            w_acpl REAL,
-            w_accuracy REAL,
-            w_inaccuracies INTEGER,
-            w_mistakes INTEGER,
-            w_blunders INTEGER,
-            b_acpl REAL,
-            b_accuracy REAL,
-            b_inaccuracies INTEGER,
-            b_mistakes INTEGER,
-            b_blunders INTEGER,
-            UNIQUE(game_id)
-        )
-
+This is the schema of the sqlite database:
+Table name: game_metrics
+Columns:
+- id: integer
+- date: text ("2017-01", "2017-07", ..., "2025-01", "2025-07")
+- game_id: text
+- w_elo: integer
+- b_elo: integer
+- bin: text (rating bin, e.g. "1300", "1500", ..., "2300")
+- game_result text
+- time_control text
+- tempo text ("rapid", "blitz", "bullet")
+- w_acpl real
+- w_accuracy real
+- w_inaccuracies integer
+- w_mistakes integer
+- w_blunders integer
+- b_acpl real
+- b_accuracy real
+- b_inaccuracies integer
+- b_mistakes integer
+- b_blunders integer
 """
 
-def get_accuracy_rating_data(year: str, tempo: str) -> List[Tuple[float, float]]:
-    # Connects to database, for each game, gets the game accuracy and rating for each side
-    # I am aware that repeatedly calling this function will be inefficient, but it is what it is
+# Error means: blunder, mistake, inaccuracy.
+
+def get_data(select: list[str], where: dict[str, str]) -> List[Tuple]:
+    # A generic function to get data from the database
+    # select: list of columns to select
+    # where: dictionary of column names and values to filter by
+    # returns a list of tuples, each tuple contains the values of the selected columns
+    
+    keys, values = zip(*where.items())
+    query = "SELECT " + ", ".join(select) + " FROM game_metrics WHERE " + " AND ".join([f"{k} = ?" for k in keys])
 
     conn = sqlite3.connect("chess_metrics.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT w_accuracy, w_elo, b_accuracy, b_elo FROM game_metrics WHERE date LIKE ? AND tempo = ?", (f"{year}%", tempo))
+    cursor.execute(query, values)
     data = cursor.fetchall()
     conn.close()
 
-    games = []
-    for datum in data:
-        w_accuracy, w_elo, b_accuracy, b_elo = datum
-        games.append((w_accuracy, w_elo))
-        games.append((b_accuracy, b_elo))
+    return data
 
-    return np.array(games)
-
-
-def plot1():
-    # calculate the correlation between accuracy and rating for each year and plot a line plot
-    # repeat for each tempo so that we have N lines
-    
-    corr_coeffs = {tempo: [] for tempo in cfg.TIME_CONTROL.keys()}
-
-    for tempo in cfg.TIME_CONTROL.keys():
-        for year in cfg.EVERY_N_MONTHS:
-            data = get_accuracy_rating_data(year, tempo)
-            plt.figure(figsize=(10, 6), dpi=100)
-            plt.scatter(data[:, 0], data[:, 1])
-            plt.grid(True, linestyle='-', alpha=0.7)
-            plt.tight_layout()
-
-            # fit a line
-            slope, intercept = np.polyfit(data[:, 0], data[:, 1], 1)
-            plt.plot(data[:, 0], slope * data[:, 0] + intercept, color='red')
-
-            plt.title(f"Accuracy vs Rating for {tempo} in {year}")
-            plt.xlabel("Accuracy")
-            plt.ylabel("Rating")
-            plt.savefig(f"accuracy_rating_correlation_{tempo}_{year}.png", 
-                        bbox_inches='tight', 
-                        facecolor='white', 
-                        edgecolor='none')
-
-            plt.close()
-
-            corr_coeffs[tempo].append(np.corrcoef(data[:, 0], data[:, 1])[0, 1])
-
-
-    plt.figure(figsize=(10, 6), dpi=100)
-    plt.title("Accuracy vs Rating Correlation")
-    plt.xlabel("Year")
-    plt.ylabel("Correlation Coefficient")
-    for tempo in cfg.TIME_CONTROL.keys():
-        plt.plot(cfg.EVERY_N_MONTHS, corr_coeffs[tempo], label=tempo)
-    plt.legend()
-    plt.show()
-
-    plt.savefig("accuracy_rating_correlation.png", 
-                bbox_inches='tight', 
-                facecolor='white', 
-                edgecolor='none')
-
-
+def plot_errors_per_bin():
+    # Plot number of errors per rating bin for date 2020 and 2025
+    # save separeta plot images for each tempo
+    ...
 
 
 if __name__ == '__main__':
     # plot_winpercent_formula()
     # plot_accuracy_formula()
-    g1=get_accuracy_rating_data("2017-01", "bullet")
-    g2=get_accuracy_rating_data("2017-01", "blitz")
 
-    # read json file and load: game accuracy, error counts, acpl
-    # json[tempo][rating][game_identifier] = {
-    #     "accuracy": (float, float),
-    #     "error_counts": ((int,int,int), (int,int,int)),
-    #     "acpl": (float, float)
-    # }
-        
-    
+    #############################################################
+    date = "2022-01"
+    tempo = "rapid"
+    # g1=get_accuracy_rating_data(date, tempo)
+    raw_data = get_data(select=["w_accuracy", "b_accuracy", "w_elo", "b_elo"], where={"tempo": tempo, "date": date})
+    _w_accuracy, _b_accuracy, _w_elo, _b_elo = zip(*raw_data)
+
+    accuracy = np.array(_w_accuracy + _b_accuracy)
+    elo = np.array(_w_elo + _b_elo)
+
+    # draw kde plot for each rating bin in the same figure
+    plt.figure(figsize=(10, 6), dpi=100)
+    for i, bin in enumerate(cfg.RATING_BINS):
+        mask = (elo >= bin[0]) & (elo <= bin[1])
+        bin_mean = cfg.RATING_BIN_MEANS[i]
+        sns.kdeplot(data=accuracy[mask], label=f"Rating Bin {bin_mean}")
+    plt.legend()
+    plt.title(f"KDE Plot for {tempo} in {date}")
+    plt.xlabel("Accuracy")
+    plt.ylabel("Density")
+    plt.savefig(f"accuracy_kde_plot_{tempo}_{date}.png", 
+                bbox_inches='tight', 
+                facecolor='white', 
+                edgecolor='none')
+    plt.close()
+
+    #############################################################
+
+    tempo = "rapid"
+    rating_bin = "2100"
+    # accuracy_data_ = get_accuracy_data_v2(tempo, rating_bin)
+    accuracy_data = get_data(select=["w_accuracy", "b_accuracy", "date"], where={"tempo": tempo, "bin": rating_bin})
+    _w_accuracy, _b_accuracy, _date = zip(*accuracy_data)
+
+    accuracy_data = {}
+    for dt, w_a, b_a in zip(_date, _w_accuracy, _b_accuracy):
+        if dt not in accuracy_data:
+            accuracy_data[dt] = []
+        accuracy_data[dt].extend([w_a, b_a])
+
+    # plot game accuracies for each date
+    plt.figure(figsize=(10, 6), dpi=100)
+    # make the color intensity increase with the date
+    colors = sns.color_palette("viridis", len(accuracy_data))[::-1]
+    for i, date in enumerate(sorted(accuracy_data.keys())):
+        sns.kdeplot(data=accuracy_data[date], label=date, color=colors[i])
+
+    plt.legend()
+    plt.title(f"{tempo} {rating_bin} Rating Bin Accuracy")
+    plt.xlabel("Accuracy")
+    plt.ylabel("Density")
+    plt.savefig(f"{tempo}_{rating_bin}_accuracy.png", 
+                bbox_inches='tight', 
+                facecolor='white',
+                edgecolor='none')
+
+    plt.close()
+
+    # ############################################################
+
+    raw_data = get_data(select=["w_acpl", "b_acpl", "w_elo", "b_elo"], where={"date": "2025-01"})
+    _w_acpl, _b_acpl, _w_elo, _b_elo = zip(*raw_data)
+
+    acpl = np.array(_w_acpl + _b_acpl)
+    elo = np.array(_w_elo + _b_elo)
+
+
+    plt.figure(figsize=(10, 6), dpi=100)
+    plt.scatter(acpl, elo, alpha=0.5, s=5)
+    plt.grid(True, linestyle='-', alpha=0.7)
+    plt.tight_layout()
+    plt.title("ACPL vs Rating")
+    plt.xlabel("ACPL")
+    plt.ylabel("Rating")
+    plt.savefig("acpl_rating_2025_01.png", 
+                bbox_inches='tight', 
+                facecolor='white', 
+                edgecolor='none')
+    plt.close()
