@@ -120,7 +120,7 @@ def get_data(select: list[str], where: dict[str, str]) -> List[Tuple]:
     # select: list of columns to select
     # where: dictionary of column names and values to filter by
     # returns a list of tuples, each tuple contains the values of the selected columns
-    
+
     keys, values = zip(*where.items())
     query = "SELECT " + ", ".join(select) + " FROM game_metrics WHERE " + " AND ".join([f"{k} = ?" for k in keys])
 
@@ -132,10 +132,89 @@ def get_data(select: list[str], where: dict[str, str]) -> List[Tuple]:
 
     return data
 
-def plot_errors_per_bin():
-    # Plot number of errors per rating bin for date 2020 and 2025
-    # save separeta plot images for each tempo
-    ...
+def plot_errors_per_bin(date, tempo):
+    raw_data = get_data(select=["w_blunders", "b_blunders", "w_mistakes", "b_mistakes", "w_inaccuracies", "b_inaccuracies", "w_elo", "b_elo"], where={"date": date, "tempo": tempo})
+
+    _w_blunders, _b_blunders, _w_mistakes, _b_mistakes, _w_inaccuracies, _b_inaccuracies, _w_elo, _b_elo = zip(*raw_data)
+
+    blunders = np.array(_w_blunders + _b_blunders)
+    mistakes = np.array(_w_mistakes + _b_mistakes)
+    inaccuracies = np.array(_w_inaccuracies + _b_inaccuracies)
+    elo = np.array(_w_elo + _b_elo)
+
+    # grouped bar plots with standard deviation error bars 
+    # for blunders, mistakes, and inaccuracies 
+    # seperate each group by rating bin, for each rating bin, plot the mean and standard deviation error bars for blunders, mistakes, and inaccuracies
+    
+    # Calculate statistics for each rating bin
+    bin_labels = []
+    blunders_means = []
+    blunders_stds = []
+    mistakes_means = []
+    mistakes_stds = []
+    inaccuracies_means = []
+    inaccuracies_stds = []
+    
+    for i, bin_range in enumerate(cfg.RATING_BINS):
+        # Create mask for current rating bin
+        mask = (elo >= bin_range[0]) & (elo <= bin_range[1])
+        
+        # Skip if no data in this bin
+        if not np.any(mask):
+            continue
+            
+        bin_labels.append(str(cfg.RATING_BIN_MEANS[i]))
+        
+        # Calculate means and standard deviations for each error type
+        blunders_means.append(np.mean(blunders[mask]))
+        blunders_stds.append(np.std(blunders[mask]))
+        
+        mistakes_means.append(np.mean(mistakes[mask]))
+        mistakes_stds.append(np.std(mistakes[mask]))
+        
+        inaccuracies_means.append(np.mean(inaccuracies[mask]))
+        inaccuracies_stds.append(np.std(inaccuracies[mask]))
+    
+    # Convert to numpy arrays for easier manipulation
+    blunders_means = np.array(blunders_means)
+    blunders_stds = np.array(blunders_stds)
+    mistakes_means = np.array(mistakes_means)
+    mistakes_stds = np.array(mistakes_stds)
+    inaccuracies_means = np.array(inaccuracies_means)
+    inaccuracies_stds = np.array(inaccuracies_stds)
+    
+    # Create the grouped bar plot
+    plt.figure(figsize=(12, 8), dpi=100)
+    
+    x = np.arange(len(bin_labels))  # Label locations
+    width = 0.25  # Width of bars
+    
+    # Create bars with error bars
+    bars1 = plt.bar(x - width, blunders_means, width, yerr=blunders_stds, 
+                   label='Blunders', capsize=5, alpha=0.8)
+    bars2 = plt.bar(x, mistakes_means, width, yerr=mistakes_stds, 
+                   label='Mistakes', capsize=5, alpha=0.8)
+    bars3 = plt.bar(x + width, inaccuracies_means, width, yerr=inaccuracies_stds, 
+                   label='Inaccuracies', capsize=5, alpha=0.8)
+    
+    # Customize the plot
+    plt.title(f'Average Errors per Game by Rating Bin ({tempo}, {date})', 
+             fontsize=14, pad=15)
+    plt.xlabel('Rating Bin', fontsize=12)
+    plt.ylabel('Average Number of Errors per Game', fontsize=12)
+    plt.xticks(x, bin_labels)
+    plt.legend()
+    plt.grid(True, linestyle='-', alpha=0.3, axis='y')
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save the plot
+    plt.savefig(f"errors_by_rating_bin_{tempo}_{date}.png", 
+                bbox_inches='tight', 
+                facecolor='white', 
+                edgecolor='none')
+    plt.close()
 
 
 if __name__ == '__main__':
@@ -221,3 +300,15 @@ if __name__ == '__main__':
                 facecolor='white', 
                 edgecolor='none')
     plt.close()
+
+    ############################################################
+
+    plot_errors_per_bin("2025-01", "rapid")
+    plot_errors_per_bin("2025-01", "blitz")
+    plot_errors_per_bin("2025-01", "bullet")
+
+    plot_errors_per_bin("2020-01", "rapid")
+    plot_errors_per_bin("2020-01", "blitz")
+    plot_errors_per_bin("2020-01", "bullet")
+
+
